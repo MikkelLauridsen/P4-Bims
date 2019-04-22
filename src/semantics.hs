@@ -56,5 +56,3 @@ evalStatement stmt env =
         (CompositeNode sn1 sn2) -> evalStatement sn2 (evalStatement sn1 env)
         --(IfNode bn sn1 sn2)     -> 
         --(WhileNode bn sn)       -> 
-
---data State =  
