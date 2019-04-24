@@ -22,4 +22,3 @@ instance CodeGenerator ArithExprNode where
 
 instance CodeGenerator StatementNode where
     genCode a = [] --TODO
-
