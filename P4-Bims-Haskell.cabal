@@ -30,6 +30,7 @@ library
       Ast
       Semantics
       JVM
+      CodeGenerator
   other-modules:
       Paths_P4_Bims_Haskell
   hs-source-dirs:
