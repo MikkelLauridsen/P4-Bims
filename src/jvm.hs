@@ -10,15 +10,13 @@ module JVM
     , getIns
     ) where
 
-import Data.Char
 import Data.Bits
+import Data.Word
+import Data.ByteString hiding (map, concat)
 
-class Encodable a where
-    toBytes :: a -> [Char]
-
-type UInt8 = Int
-type UInt16 = Int
-type UInt32 = Int
+type UInt8 = Word8
+type UInt16 = Word16
+type UInt32 = Word32
 
 type PoolIndex = UInt16
 
@@ -34,7 +32,6 @@ data FieldInfo = FieldInfo
     { fieldAccessFlags     :: UInt16
     , fieldName            :: PoolIndex
     , fieldDescriptor      :: PoolIndex
-    , fieldAttributesCount :: UInt16
     , fieldAttributes      :: [AttributeInfo]
     }
 
@@ -42,7 +39,6 @@ data MethodInfo = MethodInfo
     { methodAccessFlags     :: UInt16
     , methodName            :: PoolIndex
     , methodDescriptor      :: PoolIndex
-    , methodAttributesCount :: UInt16
     , methodAttributes      :: [AttributeInfo]
     }
 
@@ -66,9 +62,7 @@ data AttributeInfo
         , codeMaxLocals       :: UInt16
         , codeLength          :: UInt32
         , code                :: [UInt8]
-        , codeExceptionsCount :: UInt16
         , codeExceptions      :: [ExceptionInfo]
-        , codeAttributesCount :: UInt16
         , codeAttributes      :: [AttributeInfo]
         }
 
@@ -76,88 +70,97 @@ data ClassFile = ClassFile
     { magicNumber     :: [UInt8]
     , versionMinor    :: UInt16
     , versionMajor    :: UInt16
-    , cpCount         :: UInt16
     , constantPool    :: [PoolConstant]
     , accessFlags     :: UInt16
     , thisClass       :: PoolIndex
     , superClass      :: PoolIndex
-    , interfacesCount :: UInt16
     , interfaces      :: [PoolIndex]
-    , fieldsCount     :: UInt16
     , fields          :: [FieldInfo]
-    , methodsCount    :: UInt16
     , methods         :: [MethodInfo]   
-    , attributesCount :: UInt16
     , attributes      :: [AttributeInfo]
     }
 
-uint8ToBytes :: UInt8 -> [Char]
-uint8ToBytes i = [chr (i .&. 0xFF)] --Todo: fix
+getByte b num = fromIntegral $ (shiftL num (8 * b)) .&. 0xFF
 
-uint16ToBytes :: UInt16 -> [Char]
+getUint16Len :: [a] -> UInt16
+getUint16Len a = fromIntegral (Prelude.length a)
+
+stringToBytes :: String -> [UInt8]
+stringToBytes str = map (toEnum . fromEnum) str 
+
+uint8ToBytes :: UInt8 -> [UInt8]
+uint8ToBytes i = [i]
+
+uint16ToBytes :: UInt16 -> [UInt8]
 uint16ToBytes i = 
-    uint8ToBytes (shiftL i 8) ++ 
-    uint8ToBytes i
+    uint8ToBytes (getByte 1 i) ++ 
+    uint8ToBytes (getByte 0 i)
 
-uint32ToBytes :: UInt32 -> [Char]
+uint32ToBytes :: UInt32 -> [UInt8]
 uint32ToBytes i =
-    uint8ToBytes (shiftL i 24) ++ 
-    uint8ToBytes (shiftL i 16) ++ 
-    uint8ToBytes (shiftL i 8) ++ 
-    uint8ToBytes i
+    uint8ToBytes (getByte 3 i) ++
+    uint8ToBytes (getByte 2 i) ++ 
+    uint8ToBytes (getByte 1 i) ++ 
+    uint8ToBytes (getByte 0 i)
 
-tableToBytes :: (a -> [Char]) -> [a] -> [Char]
+tableToBytes :: (a -> [UInt8]) -> [a] -> [UInt8]
 tableToBytes f l = concat (map f l)
 
-poolConstantToBytes :: PoolConstant -> [Char]
-poolConstantToBytes (StringConstant str)  = uint8ToBytes 3 ++ uint16ToBytes (length str) ++ str
+poolConstantToBytes :: PoolConstant -> [UInt8]
+poolConstantToBytes (StringConstant str)  = uint8ToBytes 1 ++ uint16ToBytes (getUint16Len str) ++ stringToBytes str
 poolConstantToBytes (ClassRef si)         = uint8ToBytes 7 ++ uint16ToBytes si
 poolConstantToBytes (StringRef si)        = uint8ToBytes 8 ++ uint16ToBytes si
 poolConstantToBytes (FieldRef c ntd)      = uint8ToBytes 9 ++ uint16ToBytes c ++ uint16ToBytes ntd
 poolConstantToBytes (MethodRef c ntd)     = uint8ToBytes 10 ++ uint16ToBytes c ++ uint16ToBytes ntd
 poolConstantToBytes (NameAndType nsi tdi) = uint8ToBytes 12 ++ uint16ToBytes nsi ++ uint16ToBytes tdi
 
-fieldToBytes :: FieldInfo -> [Char]
+fieldToBytes :: FieldInfo -> [UInt8]
 fieldToBytes f = 
     uint16ToBytes (fieldAccessFlags f) ++
     uint16ToBytes (fieldName f) ++
     uint16ToBytes (fieldDescriptor f) ++
-    uint16ToBytes (fieldAttributesCount f) ++
-    tableToBytes attributeToBytes (fieldAttributes f)
+    uint16ToBytes (getUint16Len attributes) ++
+    tableToBytes attributeToBytes attributes 
+    where
+        attributes = fieldAttributes f
 
-methodToBytes :: MethodInfo -> [Char]
+methodToBytes :: MethodInfo -> [UInt8]
 methodToBytes m = 
     uint16ToBytes (methodAccessFlags m) ++
     uint16ToBytes (methodName m) ++
     uint16ToBytes (methodDescriptor m) ++
-    uint16ToBytes (methodAttributesCount m) ++
-    tableToBytes attributeToBytes (methodAttributes m)
+    uint16ToBytes (getUint16Len attributes) ++
+    tableToBytes attributeToBytes attributes
+    where
+        attributes = methodAttributes m
 
 --TODO take care of codeattribute
-attributeToBytes :: AttributeInfo -> [Char]
+attributeToBytes :: AttributeInfo -> [UInt8]
 attributeToBytes a =
     uint16ToBytes (attributeName a) ++
     uint32ToBytes (attributeLength a) ++
     tableToBytes uint8ToBytes (attributeInfo a)
 
-getClassBytes :: ClassFile -> [Char]
+getClassBytes :: ClassFile -> ByteString
 getClassBytes cl = 
-    tableToBytes uint8ToBytes (magicNumber cl) ++
-    uint16ToBytes (versionMinor cl) ++
-    uint16ToBytes (versionMajor cl) ++
-    uint16ToBytes (cpCount cl) ++
-    tableToBytes poolConstantToBytes (constantPool cl) ++
-    uint16ToBytes (accessFlags cl) ++
-    uint16ToBytes (thisClass cl) ++
-    uint16ToBytes (superClass cl) ++
-    uint16ToBytes (interfacesCount cl) ++
-    tableToBytes uint16ToBytes (interfaces cl) ++
-    uint16ToBytes (fieldsCount cl) ++
-    tableToBytes fieldToBytes (fields cl) ++
-    uint16ToBytes (methodsCount cl) ++
-    tableToBytes methodToBytes (methods cl) ++
-    uint16ToBytes (attributesCount cl) ++
-    tableToBytes attributeToBytes (attributes cl)
+    pack (
+        tableToBytes uint8ToBytes (magicNumber cl) ++
+        uint16ToBytes (versionMinor cl) ++
+        uint16ToBytes (versionMajor cl) ++
+        uint16ToBytes ((getUint16Len (constantPool cl)) + 1) ++
+        tableToBytes poolConstantToBytes (constantPool cl) ++
+        uint16ToBytes (accessFlags cl) ++
+        uint16ToBytes (thisClass cl) ++
+        uint16ToBytes (superClass cl) ++
+        uint16ToBytes (getUint16Len (interfaces cl)) ++
+        tableToBytes uint16ToBytes (interfaces cl) ++
+        uint16ToBytes (getUint16Len (fields cl)) ++
+        tableToBytes fieldToBytes (fields cl) ++
+        uint16ToBytes (getUint16Len (methods cl)) ++
+        tableToBytes methodToBytes (methods cl) ++
+        uint16ToBytes (getUint16Len (attributes cl)) ++
+        tableToBytes attributeToBytes (attributes cl)
+    )
 
 data JVMOpcode = JVM_aaload | JVM_aastore
 

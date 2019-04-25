@@ -3,7 +3,7 @@ module Main where
 import Ast
 import Semantics
 import JVM
-import Data.Char
+import Data.ByteString
 
 program = AssignmentNode "result" (AddExprNode (NumExprNode "42") (NumExprNode "42"))
 
@@ -19,12 +19,13 @@ cl_constantPool = [
     ClassRef 22,
     StringConstant "<init>",
     StringConstant "()V",
+    StringConstant "Code",
     StringConstant "LineNumberTable", --Can get rid of?
     StringConstant "main",
     StringConstant "([Ljava/lang/String;)V",
     StringConstant "SourceFile",
     StringConstant "Main.java",
-    NameAndType 24 25,
+    NameAndType 7 8,
     ClassRef 23,
     NameAndType 24 25,
     StringConstant "Hello, World",
@@ -39,21 +40,16 @@ cl_constantPool = [
     StringConstant "println",
     StringConstant "(Ljava/lang/String;)V"
     ]
-cl_cpCount = length cl_constantPool
 cl_accessFlags = 0x0021
 cl_thisClass = 5
 cl_superClass = 6
 cl_interfaces = []
-cl_interfacesCount = 0
 cl_fields = []
-cl_fieldsCount = 0
 cl_methods = [
-    (MethodInfo 0x0001 7 8 1 [(AttributeInfo 9 17 [0,1,0,1,0,0,0,5,42,183,0,1,177,0,0,0,0])]),
-    (MethodInfo 0x0009 11 12 1 [(AttributeInfo 9 21 [0,2,0,1,0,0,0,9,178,0,2,18,3,182,0,4,177,0,0,0,0])])
+    (MethodInfo 0x0001 7 8 [(AttributeInfo 9 17 [0,1,0,1,0,0,0,5,42,183,0,1,177,0,0,0,0])]),
+    (MethodInfo 0x0009 11 12 [(AttributeInfo 9 21 [0,2,0,1,0,0,0,9,178,0,2,18,3,182,0,4,177,0,0,0,0])])
     ]
-cl_methodsCount = length cl_methods
 cl_attributes = []
-cl_attributesCount = 0
 
 cl :: ClassFile
 cl = (
@@ -61,22 +57,17 @@ cl = (
     cl_magicNumber
     cl_versionMinor
     cl_versionMajor
-    cl_cpCount
     cl_constantPool
     cl_accessFlags 
     cl_thisClass
     cl_superClass 
-    cl_interfacesCount 
     cl_interfaces 
-    cl_fieldsCount 
     cl_fields 
-    cl_methodsCount 
     cl_methods 
-    cl_attributesCount 
     cl_attributes
     )
 
 bytes = getClassBytes cl
 
 main :: IO ()
-main = writeFile "Main.class" bytes
+main = Data.ByteString.writeFile "Main.class" bytes
