@@ -6,8 +6,8 @@ module JVM
     , AttributeInfo(..)
     , ClassFile(..)
     , getClassBytes
-    , JVMOpcode(..)
-    , getIns
+    , JVMInstruction(..)
+    , getCodeBytes
     ) where
 
 import Data.Bits
@@ -52,12 +52,10 @@ data ExceptionInfo = ExceptionInfo
 data AttributeInfo 
     = AttributeInfo
         { attributeName   :: PoolIndex
-        , attributeLength :: UInt32
         , attributeInfo   :: [UInt8]
         }
     | CodeAttributeInfo
         { attributeName       :: PoolIndex
-        , attributeLength     :: UInt32
         , codeMaxStack        :: UInt16
         , codeMaxLocals       :: UInt16
         , code                :: [UInt8]
@@ -136,23 +134,19 @@ methodToBytes m =
     where
         attributes = methodAttributes m
 
-
-        {-data ExceptionInfo = ExceptionInfo
-    { exceptionStartPc   :: UInt16
-    , exceptionEndPc     :: UInt16
-    , exceptionHandlerPc :: UInt16
-    , exceptionCatchType :: UInt16
-    }-}
-
---TODO take care of codeattribute
 attributeToBytes :: AttributeInfo -> [UInt8]
 attributeToBytes a@(AttributeInfo{}) =
     uint16ToBytes (attributeName a) ++
-    uint32ToBytes (attributeLength a) ++
+    uint32ToBytes (getUint32Len (attributeInfo a)) ++
     tableToBytes uint8ToBytes (attributeInfo a)
 attributeToBytes a@(CodeAttributeInfo{}) =
     uint16ToBytes (attributeName a) ++
-    uint32ToBytes (attributeLength a) ++
+    uint32ToBytes (fromIntegral (
+        12 +
+        Prelude.length (code a) +
+        Prelude.length (codeExceptions a) +
+        Prelude.length (codeAttributes a)
+    )) ++
     uint16ToBytes (codeMaxStack a) ++
     uint16ToBytes (codeMaxLocals a) ++
     uint32ToBytes (getUint32Len (code a)) ++
@@ -191,10 +185,31 @@ getClassBytes cl =
         tableToBytes attributeToBytes (attributes cl)
     )
 
-data JVMOpcode = JVM_aaload | JVM_aastore
+data JVMInstruction 
+    = JVMldc UInt8            --0x12
+    | JVMaload_0              --0x2a
+    | JVMgoto UInt16          --0xa7
+    | JVMreturn               --0xb1
+    | JVMgetstatic UInt16     --0xb2
+    | JVMinvokevirtual UInt16 --0xb6
+    | JVMinvokespecial UInt16 --0xb7
+
+getInstructionBytes :: JVMInstruction -> [UInt8]
+getInstructionBytes ins = case ins of
+    (JVMldc i)           -> 0x12 : uint8ToBytes i
+    (JVMaload_0)         -> [0x2a]
+    (JVMgoto b)          -> 0xa7 : uint16ToBytes b
+    (JVMreturn)          -> [0xb1]
+    (JVMgetstatic i)     -> 0xb2 : uint16ToBytes i
+    (JVMinvokevirtual i) -> 0xb6 : uint16ToBytes i
+    (JVMinvokespecial i) -> 0xb7 : uint16ToBytes i
+
+getCodeBytes :: [JVMInstruction] -> [UInt8]
+getCodeBytes ins = concat (map getInstructionBytes ins)
 
 -- per https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings
-getIns :: JVMOpcode -> Int
+{-getIns :: JVMInstruction -> UInt8
 getIns op = case op of
     JVM_aaload  -> 0x32
     JVM_aastore -> 0x53
+    -}
