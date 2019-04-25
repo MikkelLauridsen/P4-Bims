@@ -7,6 +7,13 @@ import Data.ByteString
 
 program = AssignmentNode "result" (AddExprNode (NumExprNode "42") (NumExprNode "42"))
 
+jvmCode = [
+    178,0,2,
+    18,3,
+    182,0,4,
+    177
+    ]
+
 cl_magicNumber = [0xCA, 0xFE, 0xBA, 0xBE]
 cl_versionMinor = 0
 cl_versionMajor = 52
@@ -47,7 +54,7 @@ cl_interfaces = []
 cl_fields = []
 cl_methods = [
     (MethodInfo 0x0001 7 8 [(AttributeInfo 9 17 [0,1,0,1,0,0,0,5,42,183,0,1,177,0,0,0,0])]),
-    (MethodInfo 0x0009 11 12 [(AttributeInfo 9 21 [0,2,0,1,0,0,0,9,178,0,2,18,3,182,0,4,177,0,0,0,0])])
+    (MethodInfo 0x0009 11 12 [(CodeAttributeInfo 9 21 2 1 jvmCode [] [])])
     ]
 cl_attributes = []
 

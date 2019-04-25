@@ -60,7 +60,6 @@ data AttributeInfo
         , attributeLength     :: UInt32
         , codeMaxStack        :: UInt16
         , codeMaxLocals       :: UInt16
-        , codeLength          :: UInt32
         , code                :: [UInt8]
         , codeExceptions      :: [ExceptionInfo]
         , codeAttributes      :: [AttributeInfo]
@@ -84,6 +83,9 @@ getByte b num = fromIntegral $ (shiftL num (8 * b)) .&. 0xFF
 
 getUint16Len :: [a] -> UInt16
 getUint16Len a = fromIntegral (Prelude.length a)
+
+getUint32Len :: [a] -> UInt32
+getUint32Len a = fromIntegral (Prelude.length a)
 
 stringToBytes :: String -> [UInt8]
 stringToBytes str = map (toEnum . fromEnum) str 
@@ -134,12 +136,39 @@ methodToBytes m =
     where
         attributes = methodAttributes m
 
+
+        {-data ExceptionInfo = ExceptionInfo
+    { exceptionStartPc   :: UInt16
+    , exceptionEndPc     :: UInt16
+    , exceptionHandlerPc :: UInt16
+    , exceptionCatchType :: UInt16
+    }-}
+
 --TODO take care of codeattribute
 attributeToBytes :: AttributeInfo -> [UInt8]
-attributeToBytes a =
+attributeToBytes a@(AttributeInfo{}) =
     uint16ToBytes (attributeName a) ++
     uint32ToBytes (attributeLength a) ++
     tableToBytes uint8ToBytes (attributeInfo a)
+attributeToBytes a@(CodeAttributeInfo{}) =
+    uint16ToBytes (attributeName a) ++
+    uint32ToBytes (attributeLength a) ++
+    uint16ToBytes (codeMaxStack a) ++
+    uint16ToBytes (codeMaxLocals a) ++
+    uint32ToBytes (getUint32Len (code a)) ++
+    tableToBytes uint8ToBytes (code a) ++
+    uint16ToBytes (getUint16Len (codeExceptions a)) ++
+    tableToBytes exceptionToBytes (codeExceptions a) ++
+    uint16ToBytes (getUint16Len (codeAttributes a)) ++
+    tableToBytes attributeToBytes (codeAttributes a)
+
+exceptionToBytes :: ExceptionInfo -> [UInt8]
+exceptionToBytes e =
+    uint16ToBytes (exceptionStartPc e) ++
+    uint16ToBytes (exceptionEndPc e) ++
+    uint16ToBytes (exceptionHandlerPc e) ++
+    uint16ToBytes (exceptionCatchType e)
+
 
 getClassBytes :: ClassFile -> ByteString
 getClassBytes cl = 
