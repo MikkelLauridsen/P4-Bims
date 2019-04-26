@@ -20,9 +20,6 @@ jvmMain = [
     JVMreturn
     ]
 
-cl_magicNumber = [0xCA, 0xFE, 0xBA, 0xBE]
-cl_versionMinor = 0
-cl_versionMajor = 52
 cl_constantPool = [
     {- 1 -}  MethodRef 6 14,
     {- 2 -}  FieldRef 15 16,
@@ -52,35 +49,29 @@ cl_constantPool = [
     {- 26 -} StringConstant "println",
     {- 27 -} StringConstant "(Ljava/lang/String;)V"
     ]
-cl_accessFlags = 0x0021
-cl_thisClass = 5
-cl_superClass = 6
-cl_interfaces = []
-cl_fields = []
-cl_methods = [
+
+    cl_methods = [
     (MethodInfo 0x0001 7 8 [(CodeAttributeInfo 9 1 1 (getCodeBytes jvmInit) [] [])]),  -- <init> method
     (MethodInfo 0x0009 10 11 [(CodeAttributeInfo 9 2 1 (getCodeBytes jvmMain) [] [])]) -- main method
     ]
-cl_attributes = []
 
 cl :: ClassFile
 cl = (
     ClassFile 
-    cl_magicNumber
-    cl_versionMinor
-    cl_versionMajor
+    [0xCA, 0xFE, 0xBA, 0xBE] -- magic number
+    0                        -- version minor
+    52                       -- version major
     cl_constantPool
-    cl_accessFlags 
-    cl_thisClass
-    cl_superClass 
-    cl_interfaces 
-    cl_fields 
+    0x0021                   -- access flags 
+    5                        -- this class
+    6                        -- super class 
+    []                       -- interfaces 
+    []                       -- fields
     cl_methods 
-    cl_attributes
+    []                       --attributes
     )
 
 bytes = getClassBytes cl
 
 main :: IO ()
---main = Prelude.putStrLn (show jvmCode)
 main = Data.ByteString.writeFile "Main.class" bytes

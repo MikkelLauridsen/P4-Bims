@@ -14,55 +14,13 @@ import Data.Bits
 import Data.Word
 import Data.ByteString hiding (map, concat)
 
+-- types
 type UInt8 = Word8
 type UInt16 = Word16
 type UInt32 = Word32
-
 type PoolIndex = UInt16
 
-data PoolConstant 
-    = StringConstant String
-    | ClassRef PoolIndex
-    | StringRef PoolIndex
-    | FieldRef PoolIndex PoolIndex
-    | MethodRef PoolIndex PoolIndex
-    | NameAndType PoolIndex PoolIndex
-
-data FieldInfo = FieldInfo
-    { fieldAccessFlags     :: UInt16
-    , fieldName            :: PoolIndex
-    , fieldDescriptor      :: PoolIndex
-    , fieldAttributes      :: [AttributeInfo]
-    }
-
-data MethodInfo = MethodInfo
-    { methodAccessFlags     :: UInt16
-    , methodName            :: PoolIndex
-    , methodDescriptor      :: PoolIndex
-    , methodAttributes      :: [AttributeInfo]
-    }
-
-data ExceptionInfo = ExceptionInfo
-    { exceptionStartPc   :: UInt16
-    , exceptionEndPc     :: UInt16
-    , exceptionHandlerPc :: UInt16
-    , exceptionCatchType :: UInt16
-    }
-
-data AttributeInfo 
-    = AttributeInfo
-        { attributeName   :: PoolIndex
-        , attributeInfo   :: [UInt8]
-        }
-    | CodeAttributeInfo
-        { attributeName       :: PoolIndex
-        , codeMaxStack        :: UInt16
-        , codeMaxLocals       :: UInt16
-        , code                :: [UInt8]
-        , codeExceptions      :: [ExceptionInfo]
-        , codeAttributes      :: [AttributeInfo]
-        }
-
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.1
 data ClassFile = ClassFile
     { magicNumber     :: [UInt8]
     , versionMinor    :: UInt16
@@ -76,6 +34,55 @@ data ClassFile = ClassFile
     , methods         :: [MethodInfo]   
     , attributes      :: [AttributeInfo]
     }
+
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4
+data PoolConstant 
+    = StringConstant String
+    | ClassRef PoolIndex
+    | StringRef PoolIndex
+    | FieldRef PoolIndex PoolIndex
+    | MethodRef PoolIndex PoolIndex
+    | NameAndType PoolIndex PoolIndex
+
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.5
+data FieldInfo = FieldInfo
+    { fieldAccessFlags     :: UInt16
+    , fieldName            :: PoolIndex
+    , fieldDescriptor      :: PoolIndex
+    , fieldAttributes      :: [AttributeInfo]
+    }
+
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6
+data MethodInfo = MethodInfo
+    { methodAccessFlags     :: UInt16
+    , methodName            :: PoolIndex
+    , methodDescriptor      :: PoolIndex
+    , methodAttributes      :: [AttributeInfo]
+    }
+
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
+data ExceptionInfo = ExceptionInfo
+    { exceptionStartPc   :: UInt16
+    , exceptionEndPc     :: UInt16
+    , exceptionHandlerPc :: UInt16
+    , exceptionCatchType :: UInt16
+    }
+
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7
+-- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
+data AttributeInfo 
+    = AttributeInfo
+        { attributeName   :: PoolIndex
+        , attributeInfo   :: [UInt8]
+        }
+    | CodeAttributeInfo
+        { attributeName       :: PoolIndex
+        , codeMaxStack        :: UInt16
+        , codeMaxLocals       :: UInt16
+        , code                :: [UInt8]
+        , codeExceptions      :: [ExceptionInfo]
+        , codeAttributes      :: [AttributeInfo]
+        }
 
 getByte b num = fromIntegral $ (shiftL num (8 * b)) .&. 0xFF
 
@@ -139,6 +146,7 @@ attributeToBytes a@(AttributeInfo{}) =
     uint16ToBytes (attributeName a) ++
     uint32ToBytes (getUint32Len (attributeInfo a)) ++
     tableToBytes uint8ToBytes (attributeInfo a)
+
 attributeToBytes a@(CodeAttributeInfo{}) =
     uint16ToBytes (attributeName a) ++
     uint32ToBytes (fromIntegral (
@@ -194,6 +202,7 @@ data JVMInstruction
     | JVMinvokevirtual UInt16 --0xb6
     | JVMinvokespecial UInt16 --0xb7
 
+-- per https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings
 getInstructionBytes :: JVMInstruction -> [UInt8]
 getInstructionBytes ins = case ins of
     (JVMldc i)           -> 0x12 : uint8ToBytes i
@@ -207,9 +216,3 @@ getInstructionBytes ins = case ins of
 getCodeBytes :: [JVMInstruction] -> [UInt8]
 getCodeBytes ins = concat (map getInstructionBytes ins)
 
--- per https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings
-{-getIns :: JVMInstruction -> UInt8
-getIns op = case op of
-    JVM_aaload  -> 0x32
-    JVM_aastore -> 0x53
-    -}
