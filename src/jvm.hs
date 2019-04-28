@@ -8,6 +8,9 @@ module JVM
     , getClassBytes
     , JVMInstruction(..)
     , getCodeBytes
+    , UInt8
+    , UInt16
+    , UInt32
     ) where
 
 import Data.Bits
@@ -38,6 +41,7 @@ data ClassFile = ClassFile
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4
 data PoolConstant 
     = StringConstant String
+    | IntegerConstant UInt32
     | ClassRef PoolIndex
     | StringRef PoolIndex
     | FieldRef PoolIndex PoolIndex
@@ -115,6 +119,7 @@ tableToBytes f l = concat (map f l)
 
 poolConstantToBytes :: PoolConstant -> [UInt8]
 poolConstantToBytes (StringConstant str)  = uint8ToBytes 1 ++ uint16ToBytes (getUint16Len str) ++ stringToBytes str
+poolConstantToBytes (IntegerConstant i)   = uint8ToBytes 3 ++ uint32ToBytes i
 poolConstantToBytes (ClassRef si)         = uint8ToBytes 7 ++ uint16ToBytes si
 poolConstantToBytes (StringRef si)        = uint8ToBytes 8 ++ uint16ToBytes si
 poolConstantToBytes (FieldRef c ntd)      = uint8ToBytes 9 ++ uint16ToBytes c ++ uint16ToBytes ntd
@@ -195,6 +200,7 @@ getClassBytes cl =
 
 data JVMInstruction 
     = JVMldc UInt8            --0x12
+    | JVMldc_w UInt16         --0x12
     | JVMaload_0              --0x2a
     | JVMgoto UInt16          --0xa7
     | JVMreturn               --0xb1
@@ -206,6 +212,7 @@ data JVMInstruction
 getInstructionBytes :: JVMInstruction -> [UInt8]
 getInstructionBytes ins = case ins of
     (JVMldc i)           -> 0x12 : uint8ToBytes i
+    (JVMldc_w i)         -> 0x13 : uint16ToBytes i
     (JVMaload_0)         -> [0x2a]
     (JVMgoto b)          -> 0xa7 : uint16ToBytes b
     (JVMreturn)          -> [0xb1]

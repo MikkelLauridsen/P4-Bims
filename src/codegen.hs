@@ -1,24 +1,52 @@
-module CodeGenerator
-    ( genCode
+module Codegen
+    ( genCodeStatement
     ) where
 
 import JVM
-import AST
+import Ast
+import Data.Map.Strict as Map
 
-class CodeGenerator a where
-    genCode :: a -> [JVMOpcode]
+type ConstantPool = (Map NumeralNode UInt16, [PoolConstant], UInt16)
 
-instance CodeGenerator NumeralNode where
-    genCode a = [] --TODO
+--getVar env var = Map.lookup var env
+getConstantIndex :: NumeralNode -> ConstantPool -> (UInt16, ConstantPool)
+getConstantIndex num cPool@(indexMap, elements, poolSize) =
+    case Map.lookup num indexMap of
+        Nothing      -> (poolSize, (indexMap', elements', poolSize'))
+            where 
+                indexMap' = insert num poolSize indexMap
+                elements' = elements ++ [IntegerConstant (read num)]
+                poolSize' = poolSize + 1
+        (Just index) -> (index, cPool)
+    
 
-instance CodeGenerator VarNode where
-    genCode a = [] --TODO
+data Env = Env
+    { envInsCount     :: Int
+    , envVarMap       :: Map VarNode UInt8
+    , envConstantPool :: ConstantPool
+    , envMaxStack     :: Int
+    , envMaxLocals    :: Int
+    }
 
-instance CodeGenerator BoolExprNode where
-    genCode a = [] --TODO
+-- S, EnvV, EnvC, ConstantPool, maxStack, maxLocals -> (instructions, EnvV, EnvC, ConstantPool, maxStack, maxLocal)
+genCodeStatement :: StatementNode -> Env -> ([JVMInstruction], Env)
+genCodeStatement (AssignmentNode var a) env = 
+    genCodeArithExpr a env
 
-instance CodeGenerator ArithExprNode where
-    genCode a = [] --TODO
+genCodeStatement (SkipNode) env = ([], env)
 
-instance CodeGenerator StatementNode where
-    genCode a = [] --TODO
+genCodeStatement (CompositeNode s1 s2) env =
+    let (ins', env'') = genCodeStatement s1 env in
+        let (ins, env') = genCodeStatement s2 env'' in
+            (ins' ++ ins, env')
+
+-- b, EnvV, EnvC, maxStack -> (instructions, EnvV, EnvC, maxStack)
+-- genCodeBoolExpr :: BoolExprNode -> EnvV -> EnvC -> Int -> ([JVMInstruction], EnvC, Int)
+
+-- b, EnvV, EnvC, maxStack -> (instructions, EnvV, EnvC, maxStack)
+genCodeArithExpr :: ArithExprNode -> Env -> ([JVMInstruction], Env)
+genCodeArithExpr (NumExprNode n) (Env insCount varMap cPool maxStack maxLocals) = 
+    let (index, cPool') = getConstantIndex n cPool in
+    ( [JVMldc_w index]
+    , (Env (insCount + 1) varMap cPool' (maxStack + 1) maxLocals)
+    )
