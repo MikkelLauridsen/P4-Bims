@@ -21,36 +21,35 @@ jvmMain = [
     ]
 
 cl_constantPool = [
-    {- 1 -}  MethodRef 6 14,
-    {- 2 -}  FieldRef 15 16,
-    {- 3 -}  StringRef 17,
-    {- 4 -}  MethodRef 18 19,
-    {- 5 -}  ClassRef 20,
-    {- 6 -}  ClassRef 21,
+    {- 1 -}  MethodRef 6 13,
+    {- 2 -}  FieldRef 14 15,
+    {- 3 -}  StringRef 16,
+    {- 4 -}  MethodRef 17 18,
+    {- 5 -}  ClassRef 19,
+    {- 6 -}  ClassRef 20,
     {- 7 -}  StringConstant "<init>",
     {- 8 -}  StringConstant "()V",
     {- 9 -}  StringConstant "Code",
     {- 10 -} StringConstant "main",
     {- 11 -} StringConstant "([Ljava/lang/String;)V",
-    {- 12 -} StringConstant "SourceFile",
-    {- 13 -} StringConstant "Main.java",
-    {- 14 -} NameAndType 7 8,
-    {- 15 -} ClassRef 22,
-    {- 16 -} NameAndType 23 24,
-    {- 17 -} StringConstant "Hello, World",
-    {- 18 -} ClassRef 25,
-    {- 19 -} NameAndType 26 27,
-    {- 20 -} StringConstant "Main",
-    {- 21 -} StringConstant "java/lang/Object",
-    {- 22 -} StringConstant "java/lang/System",
-    {- 23 -} StringConstant "out",
-    {- 24 -} StringConstant "Ljava/io/PrintStream;",
-    {- 25 -} StringConstant "java/io/PrintStream",
-    {- 26 -} StringConstant "println",
-    {- 27 -} StringConstant "(Ljava/lang/String;)V"
+    {- 12 -} StringConstant "Main.java",
+    {- 13 -} NameAndType 7 8,
+    {- 14 -} ClassRef 21,
+    {- 15 -} NameAndType 22 23,
+    {- 16 -} StringConstant "Hello, World",
+    {- 17 -} ClassRef 24,
+    {- 18 -} NameAndType 25 26,
+    {- 19 -} StringConstant "Main",
+    {- 20 -} StringConstant "java/lang/Object",
+    {- 21 -} StringConstant "java/lang/System",
+    {- 22 -} StringConstant "out",
+    {- 23 -} StringConstant "Ljava/io/PrintStream;",
+    {- 24 -} StringConstant "java/io/PrintStream",
+    {- 25 -} StringConstant "println",
+    {- 26 -} StringConstant "(Ljava/lang/String;)V"
     ]
 
-    cl_methods = [
+cl_methods = [
     (MethodInfo 0x0001 7 8 [(CodeAttributeInfo 9 1 1 (getCodeBytes jvmInit) [] [])]),  -- <init> method
     (MethodInfo 0x0009 10 11 [(CodeAttributeInfo 9 2 1 (getCodeBytes jvmMain) [] [])]) -- main method
     ]
