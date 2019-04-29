@@ -33,3 +33,4 @@ data StatementNode
     | CompositeNode StatementNode StatementNode
     | IfNode BoolExprNode StatementNode StatementNode
     | WhileNode BoolExprNode StatementNode
+    | PrintNode ArithExprNode

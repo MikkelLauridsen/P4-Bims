@@ -88,7 +88,7 @@ data AttributeInfo
         , codeAttributes      :: [AttributeInfo]
         }
 
-getByte b num = fromIntegral $ (shiftL num (8 * b)) .&. 0xFF
+getByte b num = fromIntegral $ (shiftR num (8 * b)) .&. 0xFF
 
 getUint16Len :: [a] -> UInt16
 getUint16Len a = fromIntegral (Prelude.length a)
@@ -201,7 +201,9 @@ getClassBytes cl =
 data JVMInstruction 
     = JVMldc UInt8            --0x12
     | JVMldc_w UInt16         --0x12
+    | JVMiload UInt8          --0x15
     | JVMaload_0              --0x2a
+    | JVMistore UInt8         --0x36
     | JVMgoto UInt16          --0xa7
     | JVMreturn               --0xb1
     | JVMgetstatic UInt16     --0xb2
@@ -213,9 +215,11 @@ getInstructionBytes :: JVMInstruction -> [UInt8]
 getInstructionBytes ins = case ins of
     (JVMldc i)           -> 0x12 : uint8ToBytes i
     (JVMldc_w i)         -> 0x13 : uint16ToBytes i
-    (JVMaload_0)         -> [0x2a]
+    (JVMiload i)         -> 0x15 : uint8ToBytes i
+    (JVMistore i)        -> 0x36 : uint8ToBytes i
+    (JVMaload_0)         -> 0x2a : []
     (JVMgoto b)          -> 0xa7 : uint16ToBytes b
-    (JVMreturn)          -> [0xb1]
+    (JVMreturn)          -> 0xb1 : []
     (JVMgetstatic i)     -> 0xb2 : uint16ToBytes i
     (JVMinvokevirtual i) -> 0xb6 : uint16ToBytes i
     (JVMinvokespecial i) -> 0xb7 : uint16ToBytes i
