@@ -6,33 +6,30 @@ import JVM
 import Data.ByteString
 import Codegen
 
---program = AssignmentNode "result" (AddExprNode (NumExprNode "42") (NumExprNode "42"))
-{-program = CompositeNode 
+-- Factorial of 5
+program = CompositeNode 
     (CompositeNode 
         (AssignmentNode 
-            "result"
-            (MultExprNode
-                (SubExprNode
-                    (AddExprNode 
-                        (NumExprNode "42") 
-                        (NumExprNode "42"))
-                    (NumExprNode "10")
-                )
-                (NumExprNode "3")
-            )
-        )
-        (PrintNode (VarExprNode "result"))
-    )
+            "x" (NumExprNode "1"))
+        (AssignmentNode 
+            "n" (NumExprNode "5"))) 
     (WhileNode 
-        (ComparisonNode (NumExprNode "42") (NumExprNode "42"))
-        (PrintNode (NumExprNode "42"))
-    )
-    -}
-program = 
-    WhileNode 
-        (ComparisonNode (NumExprNode "42") (NumExprNode "42"))
-        (SkipNode)
---program = PrintNode (NumExprNode "42")
+        (GreaterThanNode 
+            (VarExprNode "n") 
+            (NumExprNode "1")) 
+        (CompositeNode 
+            (AssignmentNode 
+                "x"  
+                (MultExprNode 
+                    (VarExprNode "n") 
+                    (VarExprNode "x"))) 
+            (CompositeNode
+                (AssignmentNode 
+                    "n" 
+                    (SubExprNode 
+                        (VarExprNode "n") 
+                        (NumExprNode "1")))
+                (PrintNode (VarExprNode "x")))))
 
 bytes = getClassBytes (generateClassFile program)
 

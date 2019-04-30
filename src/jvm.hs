@@ -15,6 +15,7 @@ module JVM
 
 import Data.Bits
 import Data.Word
+import Data.Int
 import Data.ByteString hiding (map, concat)
 
 -- types
@@ -114,6 +115,9 @@ uint32ToBytes i =
     uint8ToBytes (getByte 1 i) ++ 
     uint8ToBytes (getByte 0 i)
 
+int16ToBytes :: Int16 -> [UInt8]
+int16ToBytes i = uint16ToBytes (fromIntegral i)
+
 tableToBytes :: (a -> [UInt8]) -> [a] -> [UInt8]
 tableToBytes f l = concat (map f l)
 
@@ -209,9 +213,10 @@ data JVMInstruction
     | JVMiadd                 --0x60
     | JVMisub                 --0x64
     | JVMimul                 --0x68
-    | JVMif_icmpeq UInt16     --0x0f
-    | JVMif_icmpne UInt16     --0xa0
-    | JVMgoto UInt16          --0xa7
+    | JVMif_icmpeq Int16      --0x9f
+    | JVMif_icmpne Int16      --0xa0
+    | JVMif_icmpgt Int16      --0xa3
+    | JVMgoto Int16           --0xa7
     | JVMreturn               --0xb1
     | JVMgetstatic UInt16     --0xb2
     | JVMinvokevirtual UInt16 --0xb6
@@ -230,9 +235,10 @@ getInstructionBytes ins = case ins of
     (JVMiadd)            -> 0x60 : []
     (JVMisub)            -> 0x64 : []
     (JVMimul)            -> 0x68 : []
-    (JVMif_icmpeq b)     -> 0x9f : uint16ToBytes b
-    (JVMif_icmpne b)     -> 0xa0 : uint16ToBytes b
-    (JVMgoto b)          -> 0xa7 : uint16ToBytes b
+    (JVMif_icmpeq b)     -> 0x9f : int16ToBytes b
+    (JVMif_icmpne b)     -> 0xa0 : int16ToBytes b
+    (JVMif_icmpgt b)     -> 0xa3 : int16ToBytes b
+    (JVMgoto b)          -> 0xa7 : int16ToBytes b
     (JVMreturn)          -> 0xb1 : []
     (JVMgetstatic i)     -> 0xb2 : uint16ToBytes i
     (JVMinvokevirtual i) -> 0xb6 : uint16ToBytes i
