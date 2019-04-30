@@ -199,11 +199,18 @@ getClassBytes cl =
     )
 
 data JVMInstruction 
-    = JVMldc UInt8            --0x12
+    = JVMiconst_0             --0x03
+    | JVMiconst_1             --0x04
+    | JVMldc UInt8            --0x12
     | JVMldc_w UInt16         --0x12
     | JVMiload UInt8          --0x15
     | JVMaload_0              --0x2a
     | JVMistore UInt8         --0x36
+    | JVMiadd                 --0x60
+    | JVMisub                 --0x64
+    | JVMimul                 --0x68
+    | JVMif_icmpeq UInt16     --0x0f
+    | JVMif_icmpne UInt16     --0xa0
     | JVMgoto UInt16          --0xa7
     | JVMreturn               --0xb1
     | JVMgetstatic UInt16     --0xb2
@@ -213,11 +220,18 @@ data JVMInstruction
 -- per https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings
 getInstructionBytes :: JVMInstruction -> [UInt8]
 getInstructionBytes ins = case ins of
+    (JVMiconst_0)        -> 0x03 : []
+    (JVMiconst_1)        -> 0x04 : []
     (JVMldc i)           -> 0x12 : uint8ToBytes i
     (JVMldc_w i)         -> 0x13 : uint16ToBytes i
     (JVMiload i)         -> 0x15 : uint8ToBytes i
-    (JVMistore i)        -> 0x36 : uint8ToBytes i
     (JVMaload_0)         -> 0x2a : []
+    (JVMistore i)        -> 0x36 : uint8ToBytes i
+    (JVMiadd)            -> 0x60 : []
+    (JVMisub)            -> 0x64 : []
+    (JVMimul)            -> 0x68 : []
+    (JVMif_icmpeq b)     -> 0x9f : uint16ToBytes b
+    (JVMif_icmpne b)     -> 0xa0 : uint16ToBytes b
     (JVMgoto b)          -> 0xa7 : uint16ToBytes b
     (JVMreturn)          -> 0xb1 : []
     (JVMgetstatic i)     -> 0xb2 : uint16ToBytes i

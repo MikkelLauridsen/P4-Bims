@@ -7,19 +7,20 @@ import JVM
 import Ast
 import Data.Map.Strict as Map
 
-type ConstantPool = (Map NumeralNode UInt16, [PoolConstant], UInt16) -- map, pool, poolSize
-type VariableEnv = (Map VarNode UInt8, UInt8) -- map, variable count
+type EnvC = (Map NumeralNode UInt16, [PoolConstant], UInt16) -- map, pool, poolSize
+type EnvJVM = (UInt16, UInt16, UInt16, EnvC) -- byte count, maxStack, maxLocals, constants
+type EnvV = (Map VarNode UInt8, UInt8) -- map, variable count
 -- Note: there can be a maximum of 256 variables currently
 
 data Env = Env
-    { envInsCount     :: Int
-    , envVariables    :: VariableEnv
-    , envConstantPool :: ConstantPool
+    { envByteCount     :: Int
+    , envVariables    :: EnvV
+    , envConstantPool :: EnvC
     , envMaxStack     :: UInt16
     , envMaxLocals    :: UInt16
     }
 
-getConstantIndex :: NumeralNode -> ConstantPool -> (UInt16, ConstantPool)
+getConstantIndex :: NumeralNode -> EnvC -> (UInt16, EnvC)
 getConstantIndex num cPool@(indexMap, elements, poolSize) =
     case Map.lookup num indexMap of
         Nothing      -> (poolSize + 1, (indexMap', elements', poolSize'))
@@ -29,7 +30,7 @@ getConstantIndex num cPool@(indexMap, elements, poolSize) =
                 poolSize' = poolSize + 1
         (Just index) -> (index + 1, cPool)
 
-getVarIndex :: VarNode -> VariableEnv -> (UInt8, VariableEnv)
+getVarIndex :: VarNode -> EnvV -> (UInt8, EnvV)
 getVarIndex var varEnv@(indexMap, varCount) =
     case Map.lookup var indexMap of
         Nothing      -> (varCount + 1, (indexMap', varCount'))
@@ -73,14 +74,15 @@ initInstructions = [
     JVMreturn
     ]
 
-initialEnv = Env 0 (empty, 0) (empty, initialConstantPool, 26) 1 1
+initialEnvV = (empty, 0)
+initialEnvJ = (0, 1, 1, (empty, initialConstantPool, 26))
 
 generateClassFile :: StatementNode -> ClassFile
 generateClassFile ast =
-    let (ins, (Env insCount _ (_, cPool, _) maxStack maxLocals)) = genCodeStatement ast initialEnv in ClassFile 
+    let (ins, _, (byteCount, maxStack, maxLocals, (_, cPool, _))) = genCodeStatement ast initialEnvV initialEnvJ in ClassFile 
         [0xCA, 0xFE, 0xBA, 0xBE] -- magic number
         0                        -- version minor
-        52                       -- version major
+        49                       -- version major
         cPool
         0x0021                   -- access flags 
         5                        -- this class
@@ -91,45 +93,111 @@ generateClassFile ast =
           (MethodInfo 0x0009 10 11 [(CodeAttributeInfo 9 maxStack maxLocals (getCodeBytes (ins ++ [JVMreturn])) [] [])]) ] -- main method
         []                       --attributes
 
--- S, EnvV, EnvC, ConstantPool, maxStack, maxLocals -> (instructions, EnvV, EnvC, ConstantPool, maxStack, maxLocal)
-genCodeStatement :: StatementNode -> Env -> ([JVMInstruction], Env)
-genCodeStatement (AssignmentNode var a) env = 
-    let (ins', (Env insCount vars cPool maxStack maxLocals)) = genCodeArithExpr a env in
-        let (index, vars') = getVarIndex var vars in
-            (ins' ++ 
-            [JVMistore index]
-            , (Env (insCount + 1) vars' cPool maxStack (maxLocals + 1)))
+-- Adds to byteCount, maxStack and maxLocals in Env
+updateJVM :: UInt16 -> UInt16 -> UInt16 -> EnvJVM -> EnvJVM
+updateJVM b s l (byteC, maxStack, maxLocals, envC) = (byteC + b, maxStack + s, maxLocals + l, envC)
 
+updateJVME :: UInt16 -> UInt16 -> UInt16 -> EnvC -> EnvJVM -> EnvJVM
+updateJVME b s l c (byteC, maxStack, maxLocals, envC) = (byteC + b, maxStack + s, maxLocals + l, c)
 
-genCodeStatement (SkipNode) env = ([], env)
+getInsByteCount :: EnvJVM -> UInt16
+getInsByteCount (byteC, _, _, _) = byteC
 
-genCodeStatement (CompositeNode s1 s2) env =
-    let (ins', env'') = genCodeStatement s1 env in
-        let (ins, env') = genCodeStatement s2 env'' in
-            (ins' ++ ins, env')
+genCodeStatement :: StatementNode -> EnvV -> EnvJVM -> ([JVMInstruction], EnvV, EnvJVM)
+genCodeStatement (AssignmentNode var a) envV envJ =
+    (
+        ins' ++ [JVMistore index],
+        envV',
+        updateJVM 3 0 1 envJ'
+    )
+    where
+        (ins', envJ') = genCodeArithExpr a envV envJ
+        (index, envV') = getVarIndex var envV
 
-genCodeStatement (PrintNode a) env =
-    let (ins, (Env insCount vars cPool maxStack maxLocals)) = genCodeArithExpr a env in
-        (
-            [JVMgetstatic 2] ++
-            ins ++
-            [JVMinvokevirtual 4]
-            , (Env (insCount + 2) vars cPool maxStack (maxLocals + 1))
-        )
+genCodeStatement (SkipNode) envV envJ = ([], envV, envJ)
 
--- b, EnvV, EnvC, maxStack -> (instructions, EnvV, EnvC, maxStack)
--- genCodeBoolExpr :: BoolExprNode -> EnvV -> EnvC -> Int -> ([JVMInstruction], EnvC, Int)
+genCodeStatement (CompositeNode s1 s2) envV envJ =
+    (ins' ++ ins, envV', envJ')
+    where
+        (ins', envV'', envJ'') = genCodeStatement s1 envV envJ
+        (ins, envV', envJ') = genCodeStatement s2 envV'' envJ''
 
--- b, EnvV, EnvC, maxStack -> (instructions, EnvV, EnvC, maxStack)
-genCodeArithExpr :: ArithExprNode -> Env -> ([JVMInstruction], Env)
-genCodeArithExpr (NumExprNode n) (Env insCount vars cPool maxStack maxLocals) = 
-    let (index, cPool') = getConstantIndex n cPool in
+genCodeStatement (WhileNode b s) envV envJ =
+    (
+        [JVMgoto predLabel] ++
+        sIns ++
+        bIns ++
+        [JVMif_icmpeq loopLabel],
+        envV, updateJVM 3 0 0 envJ'
+    )
+    where
+        envJ3 = updateJVM 3 0 0 envJ 
+        (sIns, envV'', envJ'') = genCodeStatement s envV envJ3
+        (bIns, envJ') = genCodeBoolExpr b envV'' envJ''
+        predLabel = (getInsByteCount envJ'')
+        loopLabel = (getInsByteCount envJ) + 3
+
+genCodeStatement (PrintNode a) envV envJ =
+    (
+        [JVMgetstatic 2] ++
+        aIns ++
+        [JVMinvokevirtual 4]
+        , envV
+        , updateJVM 6 0 1 envJ'
+    )
+    where 
+        (aIns, envJ') = genCodeArithExpr a envV envJ
+
+genCodeBoolExpr :: BoolExprNode -> EnvV -> EnvJVM -> ([JVMInstruction], EnvJVM)
+genCodeBoolExpr (ComparisonNode a1 a2) envV envJ =
+    (ins ++ [
+        JVMif_icmpne notEqualLabel,
+        JVMiconst_1,
+        JVMgoto endLabel,
+        JVMiconst_0
+    ], updateJVM 8 0 0 envJ')
+    where
+        ins = ins'' ++ ins'
+        (ins'', envJ'') = genCodeArithExpr a1 envV envJ
+        (ins', envJ') = genCodeArithExpr a2 envV envJ''
+        notEqualLabel = ((getInsByteCount envJ') + 7)
+        endLabel = ((getInsByteCount envJ') + 8)
+
+genCodeArithExpr :: ArithExprNode -> EnvV -> EnvJVM -> ([JVMInstruction], EnvJVM)
+genCodeArithExpr (NumExprNode n) envV envJ@(_, _, _, envC) = 
+    let (index, envC') = getConstantIndex n envC in
         ( [JVMldc_w index]
-        , (Env (insCount + 1) vars cPool' (maxStack + 1) maxLocals)
+        , updateJVME 3 1 0 envC' envJ
         )
 
-genCodeArithExpr (VarExprNode var) (Env insCount vars cPool maxStack maxLocals) = 
-    let (index, vars') = getVarIndex var vars in
+genCodeArithExpr (VarExprNode var) envV envJ = 
+    let (index, vars') = getVarIndex var envV in
         ( [JVMiload index]
-        , (Env (insCount + 1) vars' cPool (maxStack + 1) maxLocals)
+        , updateJVM 2 1 0 envJ
         )
+    
+genCodeArithExpr (AddExprNode a1 a2) envV envJ =
+        ( ins'' ++ ins' ++ [JVMiadd]
+        , updateJVM 1 0 0 envJ'
+        )
+    where
+        (ins'', envJ'') = genCodeArithExpr a1 envV envJ
+        (ins', envJ') = genCodeArithExpr a2 envV envJ''
+
+genCodeArithExpr (SubExprNode a1 a2) envV envJ =
+        ( ins'' ++ ins' ++ [JVMisub]
+        , updateJVM 1 0 0 envJ'
+        )
+    where
+        (ins'', envJ'') = genCodeArithExpr a1 envV envJ
+        (ins', envJ') = genCodeArithExpr a2 envV envJ''
+
+genCodeArithExpr (MultExprNode a1 a2) envV envJ =
+        ( ins'' ++ ins' ++ [JVMimul]
+        , updateJVM 1 0 0 envJ'
+        )
+    where
+        (ins'', envJ'') = genCodeArithExpr a1 envV envJ
+        (ins', envJ') = genCodeArithExpr a2 envV envJ''
+
+genCodeArithExpr (ArithParenNode a) envV envJ = genCodeArithExpr a envV envJ
