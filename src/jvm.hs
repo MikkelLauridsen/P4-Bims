@@ -215,6 +215,7 @@ data JVMInstruction
     | JVMimul                 --0x68
     | JVMif_icmpeq Int16      --0x9f
     | JVMif_icmpne Int16      --0xa0
+    | JVMif_icmplt Int16      --0xa1
     | JVMif_icmpgt Int16      --0xa3
     | JVMgoto Int16           --0xa7
     | JVMreturn               --0xb1
@@ -237,6 +238,7 @@ getInstructionBytes ins = case ins of
     (JVMimul)            -> 0x68 : []
     (JVMif_icmpeq b)     -> 0x9f : int16ToBytes b
     (JVMif_icmpne b)     -> 0xa0 : int16ToBytes b
+    (JVMif_icmplt b)     -> 0xa1 : int16ToBytes b
     (JVMif_icmpgt b)     -> 0xa3 : int16ToBytes b
     (JVMgoto b)          -> 0xa7 : int16ToBytes b
     (JVMreturn)          -> 0xb1 : []
@@ -246,4 +248,3 @@ getInstructionBytes ins = case ins of
 
 getCodeBytes :: [JVMInstruction] -> [UInt8]
 getCodeBytes ins = concat (map getInstructionBytes ins)
-

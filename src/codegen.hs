@@ -9,7 +9,7 @@ import Data.Map.Strict as Map
 import Data.Int
 
 type EnvC = (Map NumeralNode UInt16, [PoolConstant], UInt16) -- map, pool, poolSize
-type EnvJVM = (UInt16, UInt16, EnvC) -- maxStack, maxLocals, constants
+type EnvJVM = (UInt16, UInt16, UInt16, EnvC) -- currentStack, maxStack, maxLocals, constants
 type EnvV = (Map VarNode UInt8, UInt8) -- map, variable count
 -- Note: there can be a maximum of 256 variables currently
 
@@ -68,11 +68,11 @@ initInstructions = [
     ]
 
 initialEnvV = (empty, 0)
-initialEnvJ = (1, 1, (empty, initialConstantPool, 26))
+initialEnvJ = (1, 1, 1, (empty, initialConstantPool, 26))
 
 generateClassFile :: StatementNode -> ClassFile
 generateClassFile ast =
-    let (ins, _, _, (maxStack, maxLocals, (_, cPool, _))) = genCodeStatement ast initialEnvV initialEnvJ in ClassFile 
+    let (ins, _, _, (_, maxStack, maxLocals, (_, cPool, _))) = genCodeStatement ast initialEnvV initialEnvJ in ClassFile 
         [0xCA, 0xFE, 0xBA, 0xBE] -- magic number
         0                        -- version minor
         49                       -- version major
@@ -87,11 +87,11 @@ generateClassFile ast =
         []                       --attributes
 
 -- Adds to byteCount, maxStack and maxLocals in Env
-updateJVM :: UInt16 -> UInt16 -> EnvJVM -> EnvJVM
-updateJVM s l (maxStack, maxLocals, envC) = (maxStack + s, maxLocals + l, envC)
+updateJVM :: Int16 -> UInt16 -> EnvJVM -> EnvJVM
+updateJVM s l envJ@(_, _, _, envC) = updateJVME s l envC envJ
 
-updateJVME :: UInt16 -> UInt16 -> EnvC -> EnvJVM -> EnvJVM
-updateJVME s l c (maxStack, maxLocals, envC) = (maxStack + s, maxLocals + l, c)
+updateJVME :: Int16 -> UInt16 -> EnvC -> EnvJVM -> EnvJVM
+updateJVME s l c (curStack, maxStack, maxLocals, _) = (fromIntegral ((fromIntegral curStack) + s), max curStack maxStack, maxLocals + l, c)
 
 genCodeStatement :: StatementNode -> EnvV -> EnvJVM -> ([JVMInstruction], Int16, EnvV, EnvJVM)
 genCodeStatement (AssignmentNode var a) envV envJ =
@@ -116,7 +116,22 @@ genCodeStatement (CompositeNode s1 s2) envV envJ =
         (s1Ins, s1InsSize, envV'', envJ'') = genCodeStatement s1 envV envJ
         (s2Ins, s2InsSize, envV', envJ') = genCodeStatement s2 envV'' envJ''
 
--- Todo: IfNode
+genCodeStatement (IfNode b s1 s2) envV envJ =
+    ( bIns ++
+      [ JVMiconst_1
+      , JVMif_icmpne (s1InsSize + 6)
+      ] ++
+      s1Ins ++
+      [JVMgoto (s2InsSize + 3)] ++
+      s2Ins
+    , bInsSize + s1InsSize + s2InsSize + 6
+    , envV'
+    , envJ'
+    )
+    where
+        (bIns, bInsSize, envJ3) = genCodeBoolExpr b envV envJ
+        (s1Ins, s1InsSize, envV'', envJ'') = genCodeStatement s1 envV envJ3
+        (s2Ins, s2InsSize, envV', envJ') = genCodeStatement s2 envV'' envJ''
 
 genCodeStatement (WhileNode b s) envV envJ =
     ( [JVMgoto (3 + sInsSize)] ++
@@ -153,13 +168,25 @@ genCodeBoolExpr (ComparisonNode a1 a2) envV envJ =
       , JVMiconst_0
       ]
     , a1InsSize + a2InsSize + 8
-    , envJ'
+    , updateJVM (-1) 0 envJ'
     )
     where
         (a1Ins, a1InsSize, envJ'') = genCodeArithExpr a1 envV envJ
         (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ''
 
--- Todo: LessThanNode
+genCodeBoolExpr (LessThanNode a1 a2) envV envJ =
+    ( a1Ins ++ a2Ins ++
+      [ JVMif_icmplt 7
+      , JVMiconst_0
+      , JVMgoto 4
+      , JVMiconst_1
+      ]
+    , a1InsSize + a2InsSize + 8
+    , updateJVM (-1) 0 envJ'
+    )
+    where
+        (a1Ins, a1InsSize, envJ'') = genCodeArithExpr a1 envV envJ
+        (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ''
 
 genCodeBoolExpr (GreaterThanNode a1 a2) envV envJ =
     ( a1Ins ++ a2Ins ++
@@ -169,22 +196,68 @@ genCodeBoolExpr (GreaterThanNode a1 a2) envV envJ =
       , JVMiconst_1
       ]
     , a1InsSize + a2InsSize + 8
-    , envJ'
+    , updateJVM (-1) 0 envJ'
     )
     where
         (a1Ins, a1InsSize, envJ'') = genCodeArithExpr a1 envV envJ
         (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ''
 
--- Todo: NotNode
+genCodeBoolExpr (NotNode b) envV envJ =
+    ( bIns ++
+      [ JVMiconst_1
+      , JVMif_icmpne 7
+      , JVMiconst_0
+      , JVMgoto 4
+      , JVMiconst_1
+      ]
+    , bInsSize + 9
+    , envJ'
+    )
+    where
+        (bIns, bInsSize, envJ') = genCodeBoolExpr b envV envJ
 
--- Todo: AndNode
+genCodeBoolExpr (AndNode b1 b2) envV envJ =
+    ( b1Ins ++
+      [ JVMiconst_1
+      , JVMif_icmpne (b2InsSize + 11) --goto false label
+      ] ++
+      b2Ins ++
+      [ JVMiconst_1
+      , JVMif_icmpne 7 --goto false label
+      , JVMiconst_1
+      , JVMgoto 4 --goto falseLabel + 1
+      , JVMiconst_0 --falseLabel
+      ]
+    , b1InsSize + b2InsSize + 13
+    , updateJVM (-1) 0 envJ'
+    )
+    where
+        (b1Ins, b1InsSize, envJ'') = genCodeBoolExpr b1 envV envJ
+        (b2Ins, b2InsSize, envJ') = genCodeBoolExpr b2 envV envJ''
 
--- Todo: OrNode
+genCodeBoolExpr (OrNode b1 b2) envV envJ =
+    ( b1Ins ++
+      [ JVMiconst_1
+      , JVMif_icmpeq (b2InsSize + 11) --goto true label
+      ] ++
+      b2Ins ++
+      [ JVMiconst_1
+      , JVMif_icmpeq 7 --goto true label
+      , JVMiconst_0
+      , JVMgoto 4 --goto true label + 1
+      , JVMiconst_1 --true label
+      ]
+    , b1InsSize + b2InsSize + 13
+    , updateJVM (-1) 0 envJ'
+    )
+    where
+        (b1Ins, b1InsSize, envJ'') = genCodeBoolExpr b1 envV envJ
+        (b2Ins, b2InsSize, envJ') = genCodeBoolExpr b2 envV envJ''
 
 genCodeBoolExpr (BoolParenNode a) envV envJ = genCodeBoolExpr a envV envJ
 
 genCodeArithExpr :: ArithExprNode -> EnvV -> EnvJVM -> ([JVMInstruction], Int16, EnvJVM)
-genCodeArithExpr (NumExprNode n) envV envJ@(_, _, envC) = 
+genCodeArithExpr (NumExprNode n) envV envJ@(_, _, _, envC) = 
     let (index, envC') = getConstantIndex n envC in
         ( [JVMldc_w index]
         , 3
@@ -201,7 +274,7 @@ genCodeArithExpr (VarExprNode var) envV envJ =
 genCodeArithExpr (AddExprNode a1 a2) envV envJ =
         ( a1Ins ++ a2Ins ++ [JVMiadd]
         , a1InsSize + a2InsSize + 1
-        , envJ'
+        , updateJVM (-1) 0 envJ'
         )
     where
         (a1Ins, a1InsSize, envJ'') = genCodeArithExpr a1 envV envJ
@@ -210,7 +283,7 @@ genCodeArithExpr (AddExprNode a1 a2) envV envJ =
 genCodeArithExpr (SubExprNode a1 a2) envV envJ =
         ( a1Ins ++ a2Ins ++ [JVMisub]
         , a1InsSize + a2InsSize + 1
-        , envJ'
+        , updateJVM (-1) 0 envJ'
         )
     where
         (a1Ins, a1InsSize, envJ'') = genCodeArithExpr a1 envV envJ
@@ -219,7 +292,7 @@ genCodeArithExpr (SubExprNode a1 a2) envV envJ =
 genCodeArithExpr (MultExprNode a1 a2) envV envJ =
         ( a1Ins ++ a2Ins ++ [JVMimul]
         , a1InsSize + a2InsSize + 1
-        , envJ'
+        , updateJVM (-1) 0 envJ'
         )
     where
         (a1Ins, a1InsSize, envJ'') = genCodeArithExpr a1 envV envJ

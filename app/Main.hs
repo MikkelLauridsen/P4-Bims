@@ -1,7 +1,6 @@
 module Main where
 
 import Ast
-import Semantics
 import JVM
 import Data.ByteString
 import Codegen
@@ -12,7 +11,7 @@ program = CompositeNode
         (AssignmentNode 
             "x" (NumExprNode "1"))
         (AssignmentNode 
-            "n" (NumExprNode "5"))) 
+            "n" (NumExprNode "10"))) 
     (WhileNode 
         (GreaterThanNode 
             (VarExprNode "n") 
