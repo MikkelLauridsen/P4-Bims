@@ -217,25 +217,25 @@ data JVMInstruction
 -- per https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings
 getInstructionBytes :: JVMInstruction -> [UInt8]
 getInstructionBytes ins = case ins of
-    (JVMiconst_0)        -> 0x03 : []
-    (JVMiconst_1)        -> 0x04 : []
-    (JVMldc i)           -> 0x12 : uint8ToBytes i
-    (JVMldc_w i)         -> 0x13 : uint16ToBytes i
-    (JVMiload i)         -> 0x15 : uint8ToBytes i
-    (JVMaload_0)         -> 0x2a : []
-    (JVMistore i)        -> 0x36 : uint8ToBytes i
-    (JVMiadd)            -> 0x60 : []
-    (JVMisub)            -> 0x64 : []
-    (JVMimul)            -> 0x68 : []
-    (JVMif_icmpeq b)     -> 0x9f : int16ToBytes b
-    (JVMif_icmpne b)     -> 0xa0 : int16ToBytes b
-    (JVMif_icmplt b)     -> 0xa1 : int16ToBytes b
-    (JVMif_icmpgt b)     -> 0xa3 : int16ToBytes b
-    (JVMgoto b)          -> 0xa7 : int16ToBytes b
-    (JVMreturn)          -> 0xb1 : []
-    (JVMgetstatic i)     -> 0xb2 : uint16ToBytes i
-    (JVMinvokevirtual i) -> 0xb6 : uint16ToBytes i
-    (JVMinvokespecial i) -> 0xb7 : uint16ToBytes i
+    JVMiconst_0        -> 0x03 : []
+    JVMiconst_1        -> 0x04 : []
+    JVMldc i           -> 0x12 : uint8ToBytes i
+    JVMldc_w i         -> 0x13 : uint16ToBytes i
+    JVMiload i         -> 0x15 : uint8ToBytes i
+    JVMaload_0         -> 0x2a : []
+    JVMistore i        -> 0x36 : uint8ToBytes i
+    JVMiadd            -> 0x60 : []
+    JVMisub            -> 0x64 : []
+    JVMimul            -> 0x68 : []
+    JVMif_icmpeq b     -> 0x9f : int16ToBytes b
+    JVMif_icmpne b     -> 0xa0 : int16ToBytes b
+    JVMif_icmplt b     -> 0xa1 : int16ToBytes b
+    JVMif_icmpgt b     -> 0xa3 : int16ToBytes b
+    JVMgoto b          -> 0xa7 : int16ToBytes b
+    JVMreturn          -> 0xb1 : []
+    JVMgetstatic i     -> 0xb2 : uint16ToBytes i
+    JVMinvokevirtual i -> 0xb6 : uint16ToBytes i
+    JVMinvokespecial i -> 0xb7 : uint16ToBytes i
 
 getCodeBytes :: [JVMInstruction] -> [UInt8]
 getCodeBytes ins = concat (map getInstructionBytes ins)

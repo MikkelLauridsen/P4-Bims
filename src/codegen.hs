@@ -77,7 +77,7 @@ generateClassFile ast =
         0       -- version minor
         49      -- version major
         cPool
-        0x0021  -- access flags (ACC_PUBLIC | ACC_SUPER)
+        0x0000  -- access flags
         4       -- this class (Main)
         5       -- super class (java/lang/Object)
         []      -- interfaces 
@@ -126,9 +126,10 @@ genCodeStatement (IfNode b s1 s2) envV envJ =
       [ JVMiconst_1
       , JVMif_icmpne (s1InsSize + 6) -- jump else
       ] ++
-      s1Ins ++ -- then code
-      [JVMgoto (s2InsSize + 3)] ++ -- jump end (after else label)
+      s1Ins ++
+      [JVMgoto (s2InsSize + 3)] ++ -- jump end
       s2Ins -- label: else
+      --label: end
     , bInsSize + s1InsSize + s2InsSize + 6
     , envV'
     , updateJVM (-1) 0 envJ'
@@ -172,10 +173,11 @@ genCodeBoolExpr :: BoolExprNode -> EnvV -> EnvJVM -> ([JVMInstruction], Int16, E
 -- Comparison boolean expression
 genCodeBoolExpr (ComparisonNode a1 a2) envV envJ =
     ( a1Ins ++ a2Ins ++
-      [ JVMif_icmpne 7
+      [ JVMif_icmpne 7 --jump true
       , JVMiconst_1
-      , JVMgoto 4
-      , JVMiconst_0
+      , JVMgoto 4 --jump end
+      , JVMiconst_0 --label: true
+        --label: end
       ]
     , a1InsSize + a2InsSize + 8
     , updateJVM (-1) 0 envJ'
@@ -187,10 +189,11 @@ genCodeBoolExpr (ComparisonNode a1 a2) envV envJ =
 -- Less than boolean expression
 genCodeBoolExpr (LessThanNode a1 a2) envV envJ =
     ( a1Ins ++ a2Ins ++
-      [ JVMif_icmplt 7
+      [ JVMif_icmplt 7 --jump true
       , JVMiconst_0
-      , JVMgoto 4
-      , JVMiconst_1
+      , JVMgoto 4 --jump end
+      , JVMiconst_1 --label: true
+        --label: end
       ]
     , a1InsSize + a2InsSize + 8
     , updateJVM (-1) 0 envJ'
@@ -202,10 +205,11 @@ genCodeBoolExpr (LessThanNode a1 a2) envV envJ =
 -- Greater than boolean expression
 genCodeBoolExpr (GreaterThanNode a1 a2) envV envJ =
     ( a1Ins ++ a2Ins ++
-      [ JVMif_icmpgt 7
+      [ JVMif_icmpgt 7 --jump true
       , JVMiconst_0
-      , JVMgoto 4
-      , JVMiconst_1
+      , JVMgoto 4 --jump end
+      , JVMiconst_1 --label: true
+        --label: end
       ]
     , a1InsSize + a2InsSize + 8
     , updateJVM (-1) 0 envJ'
@@ -218,10 +222,11 @@ genCodeBoolExpr (GreaterThanNode a1 a2) envV envJ =
 genCodeBoolExpr (NotNode b) envV envJ =
     ( bIns ++
       [ JVMiconst_1
-      , JVMif_icmpne 7
+      , JVMif_icmpne 7 --jump true
       , JVMiconst_0
-      , JVMgoto 4
-      , JVMiconst_1
+      , JVMgoto 4 --jump end
+      , JVMiconst_1 --label: true
+        --label: end
       ]
     , bInsSize + 9
     , envJ'
@@ -233,14 +238,15 @@ genCodeBoolExpr (NotNode b) envV envJ =
 genCodeBoolExpr (AndNode b1 b2) envV envJ =
     ( b1Ins ++
       [ JVMiconst_1
-      , JVMif_icmpne (b2InsSize + 11) --goto false label
+      , JVMif_icmpne (b2InsSize + 11) --jump false
       ] ++
       b2Ins ++
       [ JVMiconst_1
-      , JVMif_icmpne 7 --goto false label
+      , JVMif_icmpne 7 --jump false
       , JVMiconst_1
-      , JVMgoto 4 --goto falseLabel + 1
-      , JVMiconst_0 --falseLabel
+      , JVMgoto 4 --jump end
+      , JVMiconst_0 --label: false
+        --label: end
       ]
     , b1InsSize + b2InsSize + 13
     , updateJVM (-1) 0 envJ'
@@ -253,14 +259,15 @@ genCodeBoolExpr (AndNode b1 b2) envV envJ =
 genCodeBoolExpr (OrNode b1 b2) envV envJ =
     ( b1Ins ++
       [ JVMiconst_1
-      , JVMif_icmpeq (b2InsSize + 11) --goto true label
+      , JVMif_icmpeq (b2InsSize + 11) --jump true
       ] ++
       b2Ins ++
       [ JVMiconst_1
-      , JVMif_icmpeq 7 --goto true label
+      , JVMif_icmpeq 7 --jump true
       , JVMiconst_0
-      , JVMgoto 4 --goto true label + 1
-      , JVMiconst_1 --true label
+      , JVMgoto 4 --jump end
+      , JVMiconst_1 --label: true
+        -- label end
       ]
     , b1InsSize + b2InsSize + 13
     , updateJVM (-1) 0 envJ'
