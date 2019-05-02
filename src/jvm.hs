@@ -26,18 +26,17 @@ type PoolIndex = UInt16
 
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.1
 data ClassFile = ClassFile
-    { magicNumber     :: [UInt8]
-    , versionMinor    :: UInt16
-    , versionMajor    :: UInt16
-    , constantPool    :: [PoolConstant]
-    , accessFlags     :: UInt16
-    , thisClass       :: PoolIndex
-    , superClass      :: PoolIndex
-    , interfaces      :: [PoolIndex]
-    , fields          :: [FieldInfo]
-    , methods         :: [MethodInfo]   
-    , attributes      :: [AttributeInfo]
-    }
+    [UInt8]         -- magicNumber
+    UInt16          -- versionMinor
+    UInt16          -- versionMajor
+    [PoolConstant]  -- constantPool
+    UInt16          -- accessFlags
+    PoolIndex       --thisClass
+    PoolIndex       --superClass
+    [PoolIndex]     --interfaces
+    [FieldInfo]     --fields
+    [MethodInfo]    --methods
+    [AttributeInfo] --attributes
 
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4
 data PoolConstant 
@@ -51,43 +50,38 @@ data PoolConstant
 
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.5
 data FieldInfo = FieldInfo
-    { fieldAccessFlags     :: UInt16
-    , fieldName            :: PoolIndex
-    , fieldDescriptor      :: PoolIndex
-    , fieldAttributes      :: [AttributeInfo]
-    }
+    UInt16          -- access flags
+    PoolIndex       -- name
+    PoolIndex       -- descriptor
+    [AttributeInfo] -- attributes
 
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6
 data MethodInfo = MethodInfo
-    { methodAccessFlags     :: UInt16
-    , methodName            :: PoolIndex
-    , methodDescriptor      :: PoolIndex
-    , methodAttributes      :: [AttributeInfo]
-    }
+    UInt16          -- access flags
+    PoolIndex       -- name
+    PoolIndex       -- descriptor
+    [AttributeInfo] -- attributes
 
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
 data ExceptionInfo = ExceptionInfo
-    { exceptionStartPc   :: UInt16
-    , exceptionEndPc     :: UInt16
-    , exceptionHandlerPc :: UInt16
-    , exceptionCatchType :: UInt16
-    }
+    UInt16 -- start pc
+    UInt16 -- end pc
+    UInt16 -- handler pc
+    UInt16 -- catch type
 
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
 data AttributeInfo 
     = AttributeInfo
-        { attributeName   :: PoolIndex
-        , attributeInfo   :: [UInt8]
-        }
+        PoolIndex       -- name
+        [UInt8]         -- info
     | CodeAttributeInfo
-        { attributeName       :: PoolIndex
-        , codeMaxStack        :: UInt16
-        , codeMaxLocals       :: UInt16
-        , code                :: [UInt8]
-        , codeExceptions      :: [ExceptionInfo]
-        , codeAttributes      :: [AttributeInfo]
-        }
+        PoolIndex       -- name
+        UInt16          -- maxStack
+        UInt16          -- maxLocals
+        [UInt8]         -- code
+        [ExceptionInfo] -- exceptions
+        [AttributeInfo] -- attributes
 
 getByte b num = fromIntegral $ (shiftR num (8 * b)) .&. 0xFF
 
@@ -131,75 +125,72 @@ poolConstantToBytes (MethodRef c ntd)     = uint8ToBytes 10 ++ uint16ToBytes c +
 poolConstantToBytes (NameAndType nsi tdi) = uint8ToBytes 12 ++ uint16ToBytes nsi ++ uint16ToBytes tdi
 
 fieldToBytes :: FieldInfo -> [UInt8]
-fieldToBytes f = 
-    uint16ToBytes (fieldAccessFlags f) ++
-    uint16ToBytes (fieldName f) ++
-    uint16ToBytes (fieldDescriptor f) ++
+fieldToBytes (FieldInfo accessFlags name descriptor attributes) = 
+    uint16ToBytes accessFlags ++
+    uint16ToBytes name ++
+    uint16ToBytes descriptor ++
     uint16ToBytes (getUint16Len attributes) ++
     tableToBytes attributeToBytes attributes 
-    where
-        attributes = fieldAttributes f
 
 methodToBytes :: MethodInfo -> [UInt8]
-methodToBytes m = 
-    uint16ToBytes (methodAccessFlags m) ++
-    uint16ToBytes (methodName m) ++
-    uint16ToBytes (methodDescriptor m) ++
+methodToBytes (MethodInfo accessFlags name descriptor attributes) = 
+    uint16ToBytes accessFlags ++
+    uint16ToBytes name ++
+    uint16ToBytes descriptor ++
     uint16ToBytes (getUint16Len attributes) ++
     tableToBytes attributeToBytes attributes
-    where
-        attributes = methodAttributes m
 
 attributeToBytes :: AttributeInfo -> [UInt8]
-attributeToBytes a@(AttributeInfo{}) =
-    uint16ToBytes (attributeName a) ++
-    uint32ToBytes (getUint32Len (attributeInfo a)) ++
-    tableToBytes uint8ToBytes (attributeInfo a)
+attributeToBytes (AttributeInfo name info) =
+    uint16ToBytes name ++
+    uint32ToBytes (getUint32Len info) ++
+    tableToBytes uint8ToBytes info
 
-attributeToBytes a@(CodeAttributeInfo{}) =
-    uint16ToBytes (attributeName a) ++
+attributeToBytes (CodeAttributeInfo name maxStack maxLocals code exceptions attributes) =
+    uint16ToBytes name ++
     uint32ToBytes (fromIntegral (
         12 +
-        Prelude.length (code a) +
-        Prelude.length (codeExceptions a) +
-        Prelude.length (codeAttributes a)
+        Prelude.length code +
+        Prelude.length exceptions +
+        Prelude.length attributes
     )) ++
-    uint16ToBytes (codeMaxStack a) ++
-    uint16ToBytes (codeMaxLocals a) ++
-    uint32ToBytes (getUint32Len (code a)) ++
-    tableToBytes uint8ToBytes (code a) ++
-    uint16ToBytes (getUint16Len (codeExceptions a)) ++
-    tableToBytes exceptionToBytes (codeExceptions a) ++
-    uint16ToBytes (getUint16Len (codeAttributes a)) ++
-    tableToBytes attributeToBytes (codeAttributes a)
+    uint16ToBytes maxStack ++
+    uint16ToBytes maxLocals ++
+    uint32ToBytes (getUint32Len code) ++
+    tableToBytes uint8ToBytes code ++
+    uint16ToBytes (getUint16Len exceptions) ++
+    tableToBytes exceptionToBytes exceptions ++
+    uint16ToBytes (getUint16Len attributes) ++
+    tableToBytes attributeToBytes attributes
 
 exceptionToBytes :: ExceptionInfo -> [UInt8]
-exceptionToBytes e =
-    uint16ToBytes (exceptionStartPc e) ++
-    uint16ToBytes (exceptionEndPc e) ++
-    uint16ToBytes (exceptionHandlerPc e) ++
-    uint16ToBytes (exceptionCatchType e)
-
+exceptionToBytes (ExceptionInfo startPc endPc handlerPc catchType) =
+    uint16ToBytes startPc ++
+    uint16ToBytes endPc ++
+    uint16ToBytes handlerPc ++
+    uint16ToBytes catchType
 
 getClassBytes :: ClassFile -> ByteString
-getClassBytes cl = 
+getClassBytes 
+    (ClassFile magicNumber versionMinor versionMajor constantPool accessFlags 
+      thisClass superClass interfaces fields methods attributes) = 
     pack (
-        tableToBytes uint8ToBytes (magicNumber cl) ++
-        uint16ToBytes (versionMinor cl) ++
-        uint16ToBytes (versionMajor cl) ++
-        uint16ToBytes ((getUint16Len (constantPool cl)) + 1) ++
-        tableToBytes poolConstantToBytes (constantPool cl) ++
-        uint16ToBytes (accessFlags cl) ++
-        uint16ToBytes (thisClass cl) ++
-        uint16ToBytes (superClass cl) ++
-        uint16ToBytes (getUint16Len (interfaces cl)) ++
-        tableToBytes uint16ToBytes (interfaces cl) ++
-        uint16ToBytes (getUint16Len (fields cl)) ++
-        tableToBytes fieldToBytes (fields cl) ++
-        uint16ToBytes (getUint16Len (methods cl)) ++
-        tableToBytes methodToBytes (methods cl) ++
-        uint16ToBytes (getUint16Len (attributes cl)) ++
-        tableToBytes attributeToBytes (attributes cl)
+        tableToBytes uint8ToBytes magicNumber ++
+        uint16ToBytes versionMinor ++
+        uint16ToBytes versionMajor ++
+        uint16ToBytes ((getUint16Len constantPool) + 1) ++
+        tableToBytes poolConstantToBytes constantPool ++
+        uint16ToBytes accessFlags ++
+        uint16ToBytes thisClass ++
+        uint16ToBytes superClass ++
+        uint16ToBytes (getUint16Len interfaces) ++
+        tableToBytes uint16ToBytes interfaces ++
+        uint16ToBytes (getUint16Len fields) ++
+        tableToBytes fieldToBytes fields ++
+        uint16ToBytes (getUint16Len methods) ++
+        tableToBytes methodToBytes methods ++
+        uint16ToBytes (getUint16Len attributes) ++
+        tableToBytes attributeToBytes attributes
     )
 
 data JVMInstruction 
