@@ -11,7 +11,7 @@ import Data.Int
 type EnvC = (Map NumeralNode UInt16, [PoolConstant], UInt16) -- map, pool, poolSize
 type EnvJVM = (UInt16, UInt16, UInt16, EnvC) -- currentStack, maxStack, maxLocals, constants
 type EnvV = (Map VarNode UInt8, UInt8) -- map, variable count
--- Note: there can be a maximum of 256 variables currently
+-- Note: there can be a maximum of 256 variables
 
 getConstantIndex :: NumeralNode -> EnvC -> (UInt16, EnvC)
 getConstantIndex num cPool@(indexMap, elements, poolSize) =
@@ -23,14 +23,14 @@ getConstantIndex num cPool@(indexMap, elements, poolSize) =
                 poolSize' = poolSize + 1
         (Just index) -> (index + 1, cPool)
 
-getVarIndex :: VarNode -> EnvV -> (UInt8, EnvV)
+getVarIndex :: VarNode -> EnvV -> (UInt8, EnvV, Bool)
 getVarIndex var varEnv@(indexMap, varCount) =
     case Map.lookup var indexMap of
-        Nothing      -> (varCount + 1, (indexMap', varCount'))
+        Nothing      -> (varCount + 1, (indexMap', varCount'), False)
             where 
                 indexMap' = insert var varCount indexMap
                 varCount' = varCount + 1
-        (Just index) -> (index + 1, varEnv)
+        (Just index) -> (index + 1, varEnv, True)
 
 initialConstantPool = [
     {- 1 -}  MethodRef 5 12,
@@ -100,11 +100,13 @@ genCodeStatement (AssignmentNode var a) envV envJ =
     ( aIns ++ [JVMistore index]
     , aInsSize + 2
     , envV'
-    , updateJVM 0 1 envJ'
+    , if present
+        then envJ' 
+        else updateJVM 0 1 envJ'
     )
     where
         (aIns, aInsSize, envJ') = genCodeArithExpr a envV envJ
-        (index, envV') = getVarIndex var envV
+        (index, envV', present) = getVarIndex var envV
 
 -- Skip statement
 genCodeStatement (SkipNode) envV envJ = ([], 0, envV, envJ)
@@ -162,7 +164,7 @@ genCodeStatement (PrintNode a) envV envJ =
       [JVMinvokevirtual printConstantIndex] -- call print
     , aInsSize + 6
     , envV
-    , updateJVM 0 1 envJ'
+    , updateJVM (-1) 0 envJ'
     )
     where 
         (aIns, aInsSize, envJ') = genCodeArithExpr a envV envJ
@@ -292,7 +294,7 @@ genCodeArithExpr (NumExprNode n) envV envJ@(_, _, _, envC) =
 
 -- Variable arithmetic expression
 genCodeArithExpr (VarExprNode var) envV envJ = 
-    let (index, vars') = getVarIndex var envV in
+    let (index, vars', _) = getVarIndex var envV in
         ( [JVMiload index]
         , 2
         , updateJVM 1 0 envJ
