@@ -1,0 +1,76 @@
+
+
+var writes::(String -> (File* -> (Bool, File*))) = s => {
+    f => {
+        match s {
+            | []     -> (true, f)
+            | (c:cs) -> 
+                let (succ, f') = write c f 
+                in (case {
+                    | succ == true -> (writes cs f')
+                    | ?            -> (false, f') 
+                })
+        }
+    }
+}
+
+var readLn::(File* -> (Bool, String, File*)) = f => {
+    let (succ, c, f') = read f
+    in (case {
+        | succ == true -> 
+        match c {
+            | '\n' -> (true, ['\n'], f')
+            | ?    -> let (succ2, s, f2') = readLn f'
+                        in (case {
+                             | succ2 == true -> (true, (c:s), f2')
+                             | ?             -> (false, (c:s), f2')
+                            })
+                }
+        | ?            -> (false, [c], f')
+    })
+}
+
+#var reverse::(String -> String) = s => {
+#    match s {
+#        | []     -> []
+#        | (c:cs) -> reverse cs ++ [c]
+#    }
+#} 
+
+var prompt = s => {
+    outf => {
+        inf => {
+            let (succ, outf') = writes s outf
+            in (match succ {
+                | true -> 
+                    let (succ', line, inf') = readLn inf
+                    in (match succ' {
+                        | true -> (true, line, outf', inf')
+                        | ?    -> (false, "", outf', inf')
+                    })
+                | ?    -> (false, "", outf', inf)
+            })
+        }
+    }
+}
+
+
+var main = sys => {
+    let (succ, line, stdout', stdin') = prompt "input int-value: " stdout stdin
+    in (match succ {
+        | true -> 
+        match (to_int line) {
+            | (false, ?) -> writes "invalid string format.\n" stdout'
+            | (?, val)   -> writes ("times 2: " ++ (show (2 * val))) stdout' 
+        }
+        | ?    -> writes "could not access file.\n" stdout'
+    })
+}
+
+#var main::(System* -> (Bool, File*)) = sys => {
+#    let (succ, line, stdin') = readLn stdin 
+#    in (match succ {
+#        | true  -> writes (reverse line) stdout
+#        | false -> writes "unable to access stdin.\n" stdout
+#    })
+#}

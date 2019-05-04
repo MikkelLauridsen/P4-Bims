@@ -1,0 +1,40 @@
+#AST
+#todo
+type BoolExprNode = {
+    | ComparisonNode (ArithExprNode, ArithExprNode)
+    | LessThanNode (ArithExprNode, ArithExprNode)
+}
+
+#todo
+type ArithExprNode = {
+    | NumExprNode String
+}
+
+#todo
+type StatementNode = {
+    | AssignmentNode (String, ArithExprNode)
+}
+
+var writes::(String -> (File* -> (Bool, File*))) = s => {
+    f => {
+        match s {
+            | []     -> (true, f)
+            | (c:cs) -> 
+                let (succ, f') = write c f 
+                in (case {
+                    | succ == true -> (writes cs f')
+                    | ?            -> (false, f') 
+                })
+        }
+    }
+}
+
+#JVM
+#todo
+
+#Codegen
+#todo
+
+var main = sys => {
+    writes "it compiles!" stdout
+}
