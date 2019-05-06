@@ -192,6 +192,23 @@ var getByte::(Int -> (Int -> Char)) = b => {
     }
 }
 
+#Bruger vi overhovedet ++?
+var uint8ToBytes::(Uint8 -> [Uint8]) = i => {
+    i = [i]
+}
+
+var uint16ToBytes::(Uint16 -> [Uint8]) = i => {
+    i = uint8ToBytes (getByte 1 i) ++
+        uint8toButes (getByte 0 i)
+}
+
+var uint32ToBytes::(Uint32 -> [Uint8]) = i => {
+    i = uint8ToBytes (getByte 3 i) ++
+        uint8ToBytes (getByte 2 i) ++
+        uint8ToBytes (getByte 1 i) ++
+        uint8ToBytes (getByte 0 i)
+}
+
 #todo
 var poolConstantToBytes::(PoolConstant -> [Char]) = pc => {
     match pc {
