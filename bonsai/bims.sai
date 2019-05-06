@@ -188,38 +188,64 @@ var concat::([[a]] -> [a]) = lst => {
 #todo convert to char
 var getByte::(Int -> (Int -> Char)) = b => {
     num => {
-        i2c (num b>> (8 * b) b& 0xff)
+        i2c (num b>> (8 * b) b& 255)
     }
 }
 
-#todo
+var getBytes::(Int -> (Int -> [Char])) = c => {
+    num => {
+        case {
+            | c == 0 -> []
+            | ? -> (getByte (c - 1) num : getBytes (c - 1) num)
+        }
+    }
+}
+
+var uint8ToBytes::(Int -> [Char]) = getBytes 1
+var uint16ToBytes::(Int -> [Char]) = getBytes 2
+var uint32ToBytes::(Int -> [Char]) = getBytes 4
+
+var int16ToBytes = uint16ToBytes
+
+var tableToBytes = f => {
+    l => { concat (map f l) }
+}
+
 var poolConstantToBytes::(PoolConstant -> [Char]) = pc => {
     match pc {
-        | StringConstant str     -> []
-        | IntegerConstant i      -> []
-        | ClassRef si            -> []
-        | StringRef si           -> []
-        | FieldRef (c, ntd)      -> []
-        | MethodRef (c, ntd)     -> []
-        | NameAndType (nsi, tdi) -> []
+        | StringConstant str     -> uint8ToBytes 1 ++ uint16ToBytes (length str) ++ str
+        | IntegerConstant i      -> uint8ToBytes 3 ++ uint32ToBytes i
+        | ClassRef si            -> uint8ToBytes 7 ++ uint16ToBytes si
+        | StringRef si           -> uint8ToBytes 8 ++ uint16ToBytes si
+        | FieldRef (c, ntd)      -> uint8ToBytes 9 ++ uint16ToBytes c ++ uint16ToBytes ntd
+        | MethodRef (c, ntd)     -> uint8ToBytes 10 ++ uint16ToBytes c ++ uint16ToBytes ntd
+        | NameAndType (nsi, tdi) -> uint8ToBytes 12 ++ uint16ToBytes nsi ++ uint16ToBytes tdi
     }
 }
 
-#todo
+#todo last
 var fieldToBytes::(FieldInfo -> [Char]) = field => {
     []
 }
 
-#todo
+
 var methodToBytes::(MethodInfo -> [Char]) = method => {
-    []
+    match method {
+        | MethodInfo (accessFlags, name, descriptor, attributes) ->
+            uint16ToBytes accessFlags ++
+            uint16ToBytes name ++
+            uint16ToBytes descriptor ++
+            uint16ToBytes (length attributes) ++
+            tableToBytes attributeToBytes attributes
+    }
 }
 
 #todo
 var attributeToBytes::(AttributeInfo -> [Char]) = attribute => {
     match attribute {
-        | AttributeInfo (name, info) -> []
-        | CodeAttributeInfo (name, maxStack, maxLocals, code, exceptions, attributes) -> []
+        | AttributeInfo (name, info) -> [] #todo last
+        | CodeAttributeInfo (name, maxStack, maxLocals, code, exceptions, attributes) -> 
+            []
     }
 }
 
@@ -397,6 +423,41 @@ var genCodeArithExpr = node => {
     }
 }
 
+#https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6
+#type MethodInfo = { 
+#    | MethodInfo (
+#        UInt16,          #access flags
+#        PoolIndex,       #name
+#        PoolIndex,       #descriptor
+#        [AttributeInfo]  #attributes
+#    )
+#}
+
+var count = i => {
+    case {
+        | i == 256 -> []
+        | ? -> (i2c i : count (i + 1))
+    }
+}
+
+#test stuff
+var bytes = count 0
+
+var bytesback = map c2i bytes
+
+var temp = MethodInfo (
+    1100,
+    1,
+    2,
+    []
+)
+
+var content = bytes
+
 var main = sys => {
-    writes (concat ["hej ", "med ", "dig"]) stdout
+    let (status, sys2, file') = open_write sys "test" in (
+        let (status', file) = (writes content file') in (
+            close sys2 file
+        )
+    )
 }
