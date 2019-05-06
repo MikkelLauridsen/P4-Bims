@@ -158,7 +158,6 @@ var writes::(String -> (File* -> (Bool, File*))) = s => {
     }
 }
 
-#todo: make polymorphic
 var length::([a] -> Int) = l => {
     match l {
         | []     -> 0
@@ -166,16 +165,20 @@ var length::([a] -> Int) = l => {
     }
 }
 
-#todo http://zvon.org/other/haskell/Outputprelude/map_f.html
 var map::((a -> b) -> ([a] -> [b])) = fun => {
     lst => {
-        []
+        match lst {
+            | [] -> []
+            | (x:xs) -> ((fun x) : (map fun xs))
+        }
     }
 }
 
-#todo http://zvon.org/other/haskell/Outputprelude/concat_f.html
 var concat::([[a]] -> [a]) = lst => {
-    []
+    match lst {
+        | [] -> []
+        | (x:xs) -> x ++ (concat xs) 
+    }
 }
 
 #-------------------------------------------------------------------
@@ -185,17 +188,17 @@ var concat::([[a]] -> [a]) = lst => {
 #todo convert to char
 var getByte::(Int -> (Int -> Char)) = b => {
     num => {
-        num b>> (8 * b) b& 0xff
+        i2c (num b>> (8 * b) b& 0xff)
     }
 }
 
 #todo
 var poolConstantToBytes::(PoolConstant -> [Char]) = pc => {
     match pc {
-        | StringConstant str  -> []
-        | IntegerConstant i   -> []
-        | ClassRef si         -> []
-        | StringRef si        -> []
+        | StringConstant str     -> []
+        | IntegerConstant i      -> []
+        | ClassRef si            -> []
+        | StringRef si           -> []
         | FieldRef (c, ntd)      -> []
         | MethodRef (c, ntd)     -> []
         | NameAndType (nsi, tdi) -> []
@@ -395,5 +398,5 @@ var genCodeArithExpr = node => {
 }
 
 var main = sys => {
-    writes "it compiles!" stdout
+    writes (concat ["hej ", "med ", "dig"]) stdout
 }
