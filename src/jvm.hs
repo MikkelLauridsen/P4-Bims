@@ -73,15 +73,15 @@ data ExceptionInfo = ExceptionInfo
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
 data AttributeInfo 
     = AttributeInfo
-        PoolIndex       -- name
-        [UInt8]         -- info
+        PoolIndex        -- name
+        [UInt8]          -- info
     | CodeAttributeInfo
-        PoolIndex       -- name
-        UInt16          -- maxStack
-        UInt16          -- maxLocals
-        [UInt8]         -- code
-        [ExceptionInfo] -- exceptions
-        [AttributeInfo] -- attributes
+        PoolIndex        -- name
+        UInt16           -- maxStack
+        UInt16           -- maxLocals
+        [JVMInstruction] -- code
+        [ExceptionInfo]  -- exceptions
+        [AttributeInfo]  -- attributes
 
 getByte b num = fromIntegral $ (shiftR num (8 * b)) .&. 0xFF
 
@@ -150,18 +150,20 @@ attributeToBytes (CodeAttributeInfo name maxStack maxLocals code exceptions attr
     uint16ToBytes name ++
     uint32ToBytes (fromIntegral (
         12 +
-        Prelude.length code +
+        Prelude.length codeBytes +
         Prelude.length exceptions +
         Prelude.length attributes
     )) ++
     uint16ToBytes maxStack ++
     uint16ToBytes maxLocals ++
-    uint32ToBytes (getUint32Len code) ++
-    tableToBytes uint8ToBytes code ++
+    uint32ToBytes (getUint32Len codeBytes) ++
+    codeBytes ++
     uint16ToBytes (getUint16Len exceptions) ++
     tableToBytes exceptionToBytes exceptions ++
     uint16ToBytes (getUint16Len attributes) ++
     tableToBytes attributeToBytes attributes
+    where
+        codeBytes = tableToBytes getInstructionBytes code
 
 exceptionToBytes :: ExceptionInfo -> [UInt8]
 exceptionToBytes (ExceptionInfo startPc endPc handlerPc catchType) =
@@ -194,25 +196,25 @@ getClassBytes
     )
 
 data JVMInstruction 
-    = JVMiconst_0             --0x03
-    | JVMiconst_1             --0x04
-    | JVMldc UInt8            --0x12
-    | JVMldc_w UInt16         --0x12
-    | JVMiload UInt8          --0x15
-    | JVMaload_0              --0x2a
-    | JVMistore UInt8         --0x36
-    | JVMiadd                 --0x60
-    | JVMisub                 --0x64
-    | JVMimul                 --0x68
-    | JVMif_icmpeq Int16      --0x9f
-    | JVMif_icmpne Int16      --0xa0
-    | JVMif_icmplt Int16      --0xa1
-    | JVMif_icmpgt Int16      --0xa3
-    | JVMgoto Int16           --0xa7
-    | JVMreturn               --0xb1
-    | JVMgetstatic UInt16     --0xb2
-    | JVMinvokevirtual UInt16 --0xb6
-    | JVMinvokespecial UInt16 --0xb7
+    = JVMiconst_0             -- Push integer 0 onto stack
+    | JVMiconst_1             -- Push integer 1 onto stack
+    | JVMldc UInt8            -- Push constant from cp onto stack
+    | JVMldc_w UInt16         -- Push constant from cp onto stack (wide index)
+    | JVMiload UInt8          -- Push integer from local variable onto stack
+    | JVMaload_0              -- Push reference from cp onto stack
+    | JVMistore UInt8         -- Store top of stack to local variable
+    | JVMiadd                 -- Add two numbers on stack
+    | JVMisub                 -- Subtract two numbers on stack
+    | JVMimul                 -- Multiply two numbers on stack
+    | JVMif_icmpeq Int16      -- Jump if equal
+    | JVMif_icmpne Int16      -- Jump if not equal
+    | JVMif_icmplt Int16      -- Jump if less than
+    | JVMif_icmpgt Int16      -- Jump if greater than
+    | JVMgoto Int16           -- Jump to
+    | JVMreturn               -- Return from method
+    | JVMgetstatic UInt16     -- Push static field onto stack
+    | JVMinvokevirtual UInt16 -- Invoke virtual method
+    | JVMinvokespecial UInt16 -- Invoke special method (used for constructor)
 
 -- per https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings
 getInstructionBytes :: JVMInstruction -> [UInt8]
@@ -238,4 +240,4 @@ getInstructionBytes ins = case ins of
     JVMinvokespecial i -> 0xb7 : uint16ToBytes i
 
 getCodeBytes :: [JVMInstruction] -> [UInt8]
-getCodeBytes ins = concat (map getInstructionBytes ins)
+getCodeBytes ins = tableToBytes getInstructionBytes ins

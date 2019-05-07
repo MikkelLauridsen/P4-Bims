@@ -82,8 +82,8 @@ generateClassFile ast =
         5       -- super class (java/lang/Object)
         []      -- interfaces 
         []      -- fields
-        [ (MethodInfo 0x0001 6 7 [(CodeAttributeInfo 8 1 1 (getCodeBytes initInstructions) [] [])]), -- <init> method
-          (MethodInfo 0x0009 9 10 [(CodeAttributeInfo 8 maxStack maxLocals (getCodeBytes (ins ++ [JVMreturn])) [] [])]) ] -- main method
+        [ (MethodInfo 0x0001 6 7 [(CodeAttributeInfo 8 1 1 initInstructions [] [])]), -- <init> method
+          (MethodInfo 0x0009 9 10 [(CodeAttributeInfo 8 maxStack maxLocals (ins ++ [JVMreturn]) [] [])]) ] -- main method
         []      --attributes
 
 -- Adds to byteCount, maxStack and maxLocals in Env

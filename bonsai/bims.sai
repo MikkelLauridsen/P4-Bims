@@ -1,4 +1,13 @@
 #-------------------------------------------------------------------
+#Utility types
+#-------------------------------------------------------------------
+
+type Map<k,v> = {
+    | Node (k, v, Map, Map)
+    | Nil
+}
+
+#-------------------------------------------------------------------
 #AST types
 #-------------------------------------------------------------------
 
@@ -41,63 +50,62 @@ type StatementNode = {
 #-------------------------------------------------------------------
 #JVM types
 #-------------------------------------------------------------------
-#todo: UInt8, UInt16, UInt32, PoolIndex,
 
 #https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.1
 type ClassFile = { 
     | ClassFile (
-        [UInt8],         #magicNumber
-        UInt16,          #versionMinor
-        UInt16,          #versionMajor
-        [PoolConstant],  #constantPool
-        UInt16,          #accessFlags
-        PoolIndex,       #thisClass
-        PoolIndex,       #superClass
-        [PoolIndex],     #interfaces
-        [FieldInfo],     #fields
-        [MethodInfo],    #methods
-        [AttributeInfo]  #attributes
+        [Int],          #magicNumber
+        Int,            #versionMinor
+        Int,            #versionMajor
+        [PoolConstant], #constantPool
+        Int,            #accessFlags
+        Int,            #thisClass
+        Int,            #superClass
+        [Int],          #interfaces
+        [FieldInfo],    #fields
+        [MethodInfo],   #methods
+        [AttributeInfo] #attributes
     )
 }
 
 #https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4
 type PoolConstant = { 
     | StringConstant String
-    | IntegerConstant UInt32
-    | ClassRef PoolIndex
-    | StringRef PoolIndex
-    | FieldRef (PoolIndex, PoolIndex)
-    | MethodRef (PoolIndex, PoolIndex)
-    | NameAndType (PoolIndex, PoolIndex)
+    | IntegerConstant Int
+    | ClassRef Int
+    | StringRef Int
+    | FieldRef (Int, Int)
+    | MethodRef (Int, Int)
+    | NameAndType (Int, Int)
 }
 
 #https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.5
 type FieldInfo = {
     | FieldInfo (
-        UInt16,          #access flags
-        PoolIndex,       #name
-        PoolIndex,       #descriptor
-        [AttributeInfo]  #attributes
+        Int,            #access flags
+        Int,            #name
+        Int,            #descriptor
+        [AttributeInfo] #attributes
     )
 }
 
 #https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6
 type MethodInfo = { 
     | MethodInfo (
-        UInt16,          #access flags
-        PoolIndex,       #name
-        PoolIndex,       #descriptor
-        [AttributeInfo]  #attributes
+        Int,            #access flags
+        Int,            #name
+        Int,            #descriptor
+        [AttributeInfo] #attributes
     )
 }
 
 #https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
 type ExceptionInfo = {
     | ExceptionInfo (
-        UInt16, #start pc
-        UInt16, #end pc
-        UInt16, #handler pc
-        UInt16  #catch type
+        Int, #start pc
+        Int, #end pc
+        Int, #handler pc
+        Int  #catch type
     )
 }
 
@@ -105,67 +113,104 @@ type ExceptionInfo = {
 #https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.3
 type AttributeInfo = {
     | AttributeInfo (
-        PoolIndex,       #name
-        [UInt8]          #info
+        Int,  #name
+        [Int] #info
     )
     | CodeAttributeInfo (
-        PoolIndex,       #name
-        UInt16,          #maxStack
-        UInt16,          #maxLocals
-        [UInt8],         #code
-        [ExceptionInfo], #exceptions
-        [AttributeInfo]  #attributes
+        Int,              #name
+        Int,              #maxStack
+        Int,              #maxLocals
+        [JVMInstruction], #code
+        [ExceptionInfo],  #exceptions
+        [AttributeInfo]   #attributes
     )
 }
 
 type JVMInstruction = {
-    | JVMiconst_0             #0x03
-    | JVMiconst_1             #0x04
-    | JVMldc UInt8            #0x12
-    | JVMldc_w UInt16         #0x12
-    | JVMiload UInt8          #0x15
-    | JVMaload_0              #0x2a
-    | JVMistore UInt8         #0x36
-    | JVMiadd                 #0x60
-    | JVMisub                 #0x64
-    | JVMimul                 #0x68
-    | JVMif_icmpeq Int16      #0x9f
-    | JVMif_icmpne Int16      #0xa0
-    | JVMif_icmplt Int16      #0xa1
-    | JVMif_icmpgt Int16      #0xa3
-    | JVMgoto Int16           #0xa7
-    | JVMreturn               #0xb1
-    | JVMgetstatic UInt16     #0xb2
-    | JVMinvokevirtual UInt16 #0xb6
-    | JVMinvokespecial UInt16 #0xb7
+    | JVMiconst_0           # Push integer 0 onto stack
+    | JVMiconst_1           # Push integer 1 onto stack
+    | JVMldc Int            # Push constant from cp onto stack
+    | JVMldc_w Int          # Push constant from cp onto stack (wide index)
+    | JVMiload Int          # Push integer from local variable onto stack
+    | JVMaload_0            # Push reference from cp onto stack
+    | JVMistore Int         # Store top of stack to local variable
+    | JVMiadd               # Add two numbers on stack
+    | JVMisub               # Subtract two numbers on stack
+    | JVMimul               # Multiply two numbers on stack
+    | JVMif_icmpeq Int      # Jump if equal
+    | JVMif_icmpne Int      # Jump if not equal
+    | JVMif_icmplt Int      # Jump if less than
+    | JVMif_icmpgt Int      # Jump if greater than
+    | JVMgoto Int           # Jump to
+    | JVMreturn             # Return from method
+    | JVMgetstatic Int      # Push static field onto stack
+    | JVMinvokevirtual Int  # Invoke virtual method
+    | JVMinvokespecial Int  # Invoke special method (used for constructor)
 }
+
     
 #-------------------------------------------------------------------
 #Utility functions
 #-------------------------------------------------------------------
 
-var writes::(String -> (File* -> (Bool, File*))) = s => {
-    f => {
-        match s {
-            | []     -> (true, f)
-            | (c:cs) -> 
-                let (succ, f') = write c f 
-                in (case {
-                    | succ == true -> (writes cs f')
-                    | ?            -> (false, f') 
-                })
+var bind::(Map<k,v> -> (k -> (v -> Map<k,v>))) = 
+map => {
+    key => {
+        value => {
+            match map {
+                | Nil -> Node (key, value, Nil, Nil)
+                | Node (key', value', map1', map2') -> 
+                case {
+                    | key == key' -> Node (key, value, map1', map2')
+                    | key < key'  -> Node (key', value', (bind map1' key value), map2')
+                    | key > key'  -> Node (key', value', map1', (bind map2' key value))
+                }
+            }
+        } 
+    }
+}
+
+var lookup::(Map<k,v> -> (k -> Maybe<v>)) = 
+map => {
+    key => {
+        match map {
+            | Nil -> Nothing
+            | Node (key', value', map1', map2') ->
+            case {
+                | key == key' -> Just value'
+                | key < key'  -> lookup map1' key
+                | key > key'  -> lookup map2' key
+            }
         }
     }
 }
 
-var length::([a] -> Int) = l => {
+var writes::(String -> (File* -> (Bool, File*))) = 
+s => {
+    f => {
+        match s {
+            | []     -> (true, f)
+            | (c:cs) -> 
+                let (succ, f') = write c f in (
+                    case {
+                    | succ == true -> (writes cs f')
+                    | ?            -> (false, f') 
+                }
+            )
+        }
+    }
+}
+
+var length::([a] -> Int) = 
+l => {
     match l {
         | []     -> 0
         | (c:cs) -> 1 + length cs
     }
 }
 
-var map::((a -> b) -> ([a] -> [b])) = fun => {
+var map::((a -> b) -> ([a] -> [b])) = 
+fun => {
     lst => {
         match lst {
             | [] -> []
@@ -174,7 +219,8 @@ var map::((a -> b) -> ([a] -> [b])) = fun => {
     }
 }
 
-var concat::([[a]] -> [a]) = lst => {
+var concat::([[a]] -> [a]) = 
+lst => {
     match lst {
         | [] -> []
         | (x:xs) -> x ++ (concat xs) 
@@ -185,14 +231,15 @@ var concat::([[a]] -> [a]) = lst => {
 #JVM
 #-------------------------------------------------------------------
 
-#todo convert to char
-var getByte::(Int -> (Int -> Char)) = b => {
+var getByte::(Int -> (Int -> Char)) = 
+b => {
     num => {
-        i2c (num b>> (8 * b) b& 255)
+        i2c (num b>> (8 * b) b& 0xFF)
     }
 }
 
-var getBytes::(Int -> (Int -> [Char])) = c => {
+var getBytes::(Int -> (Int -> [Char])) = 
+c => {
     num => {
         case {
             | c == 0 -> []
@@ -207,17 +254,19 @@ var uint32ToBytes::(Int -> [Char]) = getBytes 4
 
 var int16ToBytes = uint16ToBytes
 
-var tableToBytes = f => {
+var tableToBytes::((a -> [Char]) -> ([a] -> [Char])) = 
+f => { 
     l => { concat (map f l) }
 }
 
-var poolConstantToBytes::(PoolConstant -> [Char]) = pc => {
+var poolConstantToBytes::(PoolConstant -> [Char]) = 
+pc => {
     match pc {
-        | StringConstant str     -> uint8ToBytes 1 ++ uint16ToBytes (length str) ++ str
-        | IntegerConstant i      -> uint8ToBytes 3 ++ uint32ToBytes i
-        | ClassRef si            -> uint8ToBytes 7 ++ uint16ToBytes si
-        | StringRef si           -> uint8ToBytes 8 ++ uint16ToBytes si
-        | FieldRef (c, ntd)      -> uint8ToBytes 9 ++ uint16ToBytes c ++ uint16ToBytes ntd
+        | StringConstant str     -> uint8ToBytes  1 ++ uint16ToBytes (length str) ++ str
+        | IntegerConstant i      -> uint8ToBytes  3 ++ uint32ToBytes i
+        | ClassRef si            -> uint8ToBytes  7 ++ uint16ToBytes si
+        | StringRef si           -> uint8ToBytes  8 ++ uint16ToBytes si
+        | FieldRef (c, ntd)      -> uint8ToBytes  9 ++ uint16ToBytes c ++ uint16ToBytes ntd
         | MethodRef (c, ntd)     -> uint8ToBytes 10 ++ uint16ToBytes c ++ uint16ToBytes ntd
         | NameAndType (nsi, tdi) -> uint8ToBytes 12 ++ uint16ToBytes nsi ++ uint16ToBytes tdi
     }
@@ -240,52 +289,81 @@ var methodToBytes::(MethodInfo -> [Char]) = method => {
     }
 }
 
-#todo
 var attributeToBytes::(AttributeInfo -> [Char]) = attribute => {
     match attribute {
         | AttributeInfo (name, info) -> [] #todo last
-        | CodeAttributeInfo (name, maxStack, maxLocals, code, exceptions, attributes) -> 
-            []
+        | CodeAttributeInfo (name, maxStack, maxLocals, code, exceptions, attributes) ->
+            let codeBytes = tableToBytes getInstructionBytes code in (
+                uint16ToBytes name ++
+                uint32ToBytes (
+                    12 +
+                    length codeBytes +
+                    length exceptions +
+                    length attributes
+                ) ++
+                uint16ToBytes maxStack ++
+                uint16ToBytes maxLocals ++
+                uint32ToBytes (length codeBytes) ++
+                codeBytes ++
+                uint16ToBytes (length exceptions) ++
+                tableToBytes exceptionToBytes exceptions ++
+                uint16ToBytes (length attributes) ++
+                tableToBytes attributeToBytes attributes
+            )
     }
 }
 
-#todo
+#todo last
 var exceptionToBytes::(ExceptionInfo -> [Char]) = exception => {
     []
 }
 
-#todo
-var getClassBytes::(ClassFile -> [Char]) = class => {
-    []
-}
 
-#todo
-var getInstructionBytes = ins => {
-    match ins {
-        | JVMiconst_0        -> [0x03]
-        | JVMiconst_1        -> [0x04]
-        | JVMldc i           -> [0x12]
-        | JVMldc_w i         -> [0x13]
-        | JVMiload i         -> [0x15]
-        | JVMaload_0         -> [0x2a]
-        | JVMistore i        -> [0x36]
-        | JVMiadd            -> [0x60]
-        | JVMisub            -> [0x64]
-        | JVMimul            -> [0x68]
-        | JVMif_icmpeq b     -> [0x9f]
-        | JVMif_icmpne b     -> [0xa0]
-        | JVMif_icmplt b     -> [0xa1]
-        | JVMif_icmpgt b     -> [0xa3]
-        | JVMgoto b          -> [0xa7]
-        | JVMreturn          -> [0xb1]
-        | JVMgetstatic i     -> [0xb2]
-        | JVMinvokevirtual i -> [0xb6]
-        | JVMinvokespecial i -> [0xb7]
+var getClassBytes::(ClassFile -> [Char]) = class => {
+    match class {
+        | ClassFile (magicNumber, versionMinor, versionMajor, constantPool, accessFlags, 
+        thisClass, superClass, interfaces, fields, methods, attributes) ->
+            tableToBytes  uint8ToBytes magicNumber ++
+            uint16ToBytes versionMinor ++
+            uint16ToBytes versionMajor ++
+            uint16ToBytes ((length constantPool) + 1) ++
+            tableToBytes  poolConstantToBytes constantPool ++
+            uint16ToBytes accessFlags ++
+            uint16ToBytes thisClass ++
+            uint16ToBytes superClass ++
+            uint16ToBytes (length interfaces) ++
+            tableToBytes  uint16ToBytes interfaces ++
+            uint16ToBytes (length fields) ++
+            tableToBytes  fieldToBytes fields ++
+            uint16ToBytes (length methods) ++
+            tableToBytes  methodToBytes methods ++
+            uint16ToBytes (length attributes) ++
+            tableToBytes  attributeToBytes attributes
     }
 }
 
-var getCodeBytes = ins => {
-    concat (map getInstructionBytes ins)
+var getInstructionBytes = ins => {
+    match ins {
+        | JVMiconst_0        -> (i2c 0x03 : [])
+        | JVMiconst_1        -> (i2c 0x04 : [])
+        | JVMldc i           -> (i2c 0x12 : uint8ToBytes i)
+        | JVMldc_w i         -> (i2c 0x13 : uint16ToBytes i)
+        | JVMiload i         -> (i2c 0x15 : uint8ToBytes i)
+        | JVMaload_0         -> (i2c 0x2A : [])
+        | JVMistore i        -> (i2c 0x36 : uint8ToBytes i)
+        | JVMiadd            -> (i2c 0x60 : [])
+        | JVMisub            -> (i2c 0x64 : [])
+        | JVMimul            -> (i2c 0x68 : [])
+        | JVMif_icmpeq b     -> (i2c 0x9F : int16ToBytes b)
+        | JVMif_icmpne b     -> (i2c 0xa0 : int16ToBytes b)
+        | JVMif_icmplt b     -> (i2c 0xA1 : int16ToBytes b)
+        | JVMif_icmpgt b     -> (i2c 0xA3 : int16ToBytes b)
+        | JVMgoto b          -> (i2c 0xA7 : int16ToBytes b)
+        | JVMreturn          -> (i2c 0xB1 : [])
+        | JVMgetstatic i     -> (i2c 0xB2 : uint16ToBytes i)
+        | JVMinvokevirtual i -> (i2c 0xB6 : uint16ToBytes i)
+        | JVMinvokespecial i -> (i2c 0xB7 : uint16ToBytes i)
+    }
 }
 
 #-------------------------------------------------------------------
@@ -308,9 +386,9 @@ var getVarIndex::(VarNode -> (EnvV -> (UInt16, EnvC))) = num => {
 
 var initialConstantPool = [
     # 1
-    MethodRef 5 12,
-    FieldRef 13 14,
-    MethodRef 15 16,
+    MethodRef (5, 12),
+    FieldRef (13, 14),
+    MethodRef (15, 16),
     ClassRef 17,
     ClassRef 18,
     # 6
@@ -321,12 +399,12 @@ var initialConstantPool = [
     StringConstant "([Ljava/lang/String;)V",
     #11
     StringConstant "Main.java",
-    NameAndType 6 7,
+    NameAndType (6, 7),
     ClassRef 19,
-    NameAndType 20 21,
+    NameAndType (20, 21),
     ClassRef 22,
     #16
-    NameAndType 23 24,
+    NameAndType (23, 24),
     StringConstant "Main",
     StringConstant "java/lang/Object",
     StringConstant "java/lang/System",
@@ -423,16 +501,6 @@ var genCodeArithExpr = node => {
     }
 }
 
-#https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6
-#type MethodInfo = { 
-#    | MethodInfo (
-#        UInt16,          #access flags
-#        PoolIndex,       #name
-#        PoolIndex,       #descriptor
-#        [AttributeInfo]  #attributes
-#    )
-#}
-
 var count = i => {
     case {
         | i == 256 -> []
@@ -446,13 +514,16 @@ var bytes = count 0
 var bytesback = map c2i bytes
 
 var temp = MethodInfo (
-    1100,
+    123,
     1,
     2,
-    []
+    [CodeAttributeInfo (8, 32, 32, initInstructions, [], [])]
 )
 
-var content = bytes
+var classFile = ClassFile ([1,2,3,4], 0, 49, initialConstantPool, 123, 4, 5, [], [], [temp], [])
+
+var content = getClassBytes classFile
+#var content = show initialConstantPool
 
 var main = sys => {
     let (status, sys2, file') = open_write sys "test" in (
