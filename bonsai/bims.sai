@@ -228,6 +228,25 @@ s::String => {
     }
 }
 
+var writeFile::(String -> ([Char] ->  (System* -> (Bool, System*)))) =
+path::String => {
+    bytes::[Char] => {
+        sys::System* => {
+            let (status2, sys2, file') = open_write sys path in (
+                case {
+                    | status2 == false -> (false, sys2)  #check open error
+                    | ? -> let (status', file) = writes content file' in (
+                        case {
+                            | status' == false -> (false, sys2)  #check write error
+                            | ? -> close sys2 file
+                        }
+                    )
+                }
+            )
+        }
+    }
+}
+
 var length::([a] -> Int) = 
 l::[a] => {
     match l {
@@ -424,22 +443,12 @@ numNode::NumeralNode => {
     }
 }
 
-#getVarIndex :: VarNode -> EnvV -> (UInt8, EnvV, Bool)
-#getVarIndex var varEnv@(indexMap, varCount) =
-#    case Map.lookup var indexMap of
-#        Nothing      -> (varCount + 1, (indexMap', varCount'), False)
-#            where 
-#                indexMap' = insert var varCount indexMap
-#                varCount' = varCount + 1
-#        (Just index) -> (index + 1, varEnv, True)
-
-#todo
 var getVarIndex::(VarNode -> (EnvV -> (Int, EnvV, Bool))) = 
 varNode::VarNode => {
     varEnv::EnvV => {
         match (varNode, varEnv) {
             | (VarNode vari, EnvV (indexMap, varCount)) ->
-                match (lookup indexMap vari)  {
+                match lookup indexMap vari {
                     | Nothing -> (
                             varCount + 1, EnvV (
                                 bind indexMap vari varCount,
@@ -493,30 +502,65 @@ var initInstructions::[JVMInstruction] = [
     JVMreturn
 ]
 
-##todo
 var initialEnvV::EnvV = EnvV (Nil, 0)
 var initialEnvJ::EnvJVM = EnvJVM (2, 1, 1, EnvC (Nil, initialConstantPool, length initialConstantPool))
-#
-#var generateClassFile = ast => {
-#    0
-#}
+
+#generateClassFile :: StatementNode -> ClassFile
+#generateClassFile ast =
+#    let (ins, _, _, (_, maxStack, maxLocals, (_, cPool, _))) = genCodeStatement ast initialEnvV initialEnvJ in ClassFile 
+#        [0xCA, 0xFE, 0xBA, 0xBE] -- magic number
+#        0       -- version minor
+#        49      -- version major
+#        cPool
+#        0x0000  -- access flags
+#        4       -- this class (Main)
+#        5       -- super class (java/lang/Object)
+#        []      -- interfaces 
+#        []      -- fields
+#        [ (MethodInfo 0x0001 6 7 [(CodeAttributeInfo 8 1 1 initInstructions [] [])]), -- <init> method
+#          (MethodInfo 0x0009 9 10 [(CodeAttributeInfo 8 maxStack maxLocals (ins ++ [JVMreturn]) [] [])]) ] -- main method
+#        []      --attributes
+
+var generateClassFile::(StatementNode -> ClassFile) = 
+ast::StatementNode => {
+    match genCodeStatement ast initialEnvV initialEnvJ {
+        | (ins, ?, ?, EnvJVM (?, maxStack, maxLocals, EnvC (?, cPool, ?))) -> 
+            ClassFile (
+                [0xCA, 0xFE, 0xBA, 0xBE], # magic number
+                0,      # version minor
+                49,     # version major
+                cPool,
+                0x0000, # access flags
+                4,      # this class (Main)
+                5,      # super class (java/lang/Object)
+                [],     # interfaces 
+                [],     # fields
+                [ (MethodInfo (0x0001, 6, 7, [(CodeAttributeInfo (8, 1, 1, initInstructions, [], []))])), # <init> method
+                  (MethodInfo (0x0009, 9, 10, [(CodeAttributeInfo (8, maxStack, maxLocals, (ins ++ [JVMreturn]), [], []))])) ], # main method
+                []      # attributes
+            )
+    }
+}
 
 var updateJVM::(Int -> (Int -> (EnvJVM -> EnvJVM))) = 
 s::Int => {
     l::Int => {
         envJ::EnvJVM => {
-            updateJVME s l 0 envJ
+            match envJ {
+                | EnvJVM (?, ?, ?, envC) ->
+                    updateJVME s l envC envJ
+            }
         }
     }
 }
 
-var updateJVME::(Int -> (Int -> (Int -> (EnvJVM -> EnvJVM)))) = 
+var updateJVME::(Int -> (Int -> (EnvC -> (EnvJVM -> EnvJVM)))) = 
 s::Int => {
     l::Int => {
-        c::Int => {
+        c::EnvC => {
             envJ::EnvJVM => {
                 match envJ {
-                    | EnvJVM (curStack, maxStack, maxLocals, c) ->
+                    | EnvJVM (curStack, maxStack, maxLocals, ?) ->
                         EnvJVM (curStack + s, max curStack maxStack, maxLocals + l, c)
                 }
             }
@@ -524,54 +568,75 @@ s::Int => {
     }
 }
 
-##todo
-#var genCodeStatement = node => {
-#    envV => {
-#        envJ => {
-#            match node {
-#                | AssignmentNode (v, a)  -> 0
-#                | SkipNode               -> 0
-#                | CompositeNode (s1, s2) -> 0
-#                | IfNode (b, s1, s2)     -> 0
-#                | WhileNode (b, s)       -> 0
-#                | PrintNode (a)          -> 0
-#            }
-#        }
-#    }
-#}
-#
-##todo
-#var genCodeBoolExpr = node => {
-#    envV => {
-#        envJ => {
-#            match node {
-#                | ComparisonNode (a1, a2)  -> 0
-#                | LessThanNode (a1, a2)    -> 0
-#                | GreaterThanNode (a1, a2) -> 0
-#                | NotNode b                -> 0
-#                | AndNode (b1, b2)         -> 0
-#                | OrNode (b1, b2)          -> 0
-#                | BoolParenNode a          -> 0
-#            }
-#        }
-#    }
-#}
-#
-##todo
-#var genCodeArithExpr = node => {
-#    envV => {
-#        envJ => {
-#            match node {
-#                | NumExprNode n         -> 0
-#                | VarExprNode v         -> 0
-#                | AddExprNode (a1, a2)  -> 0
-#                | SubExprNode (a1, a2)  -> 0
-#                | MultExprNode (a1, a2) -> 0
-#                | ArithParenNode a      -> 0
-#            }
-#        }
-#    }
-#}
+var genCodeStatement::(StatementNode -> (EnvV -> (EnvJVM -> ([JVMInstruction], Int, EnvV, EnvJVM)))) = 
+node::StatementNode => {
+    envV::EnvV => {
+        envJ::EnvJVM => {
+            match node {
+                | AssignmentNode (v, a)  -> 
+                    let (aIns, aInsSize, envJ') = genCodeArithExpr a envV envJ in (
+                        let (index, envV', present) = getVarIndex v envV in (
+                            ( aIns ++ [JVMistore index]
+                            , aInsSize + 2
+                            , envV'
+                            , case {
+                                | present == true -> envJ' 
+                                | ?               -> updateJVM 0 1 envJ'
+                              }
+                            )
+                        )
+                    )
+                | SkipNode -> ([], 0, envV, envJ)
+            #    | CompositeNode (s1, s2) -> 0 #todo
+            #    | IfNode (b, s1, s2)     -> 0 #todo
+            #    | WhileNode (b, s)       -> 0 #todo
+            #    | PrintNode (a)          -> 0 #todo
+            }
+        }
+    }
+}
+
+var genCodeBoolExpr::(BoolExprNode -> (EnvV -> (EnvJVM -> ([JVMInstruction], Int, EnvJVM)))) = 
+node::BoolExprNode => {
+    envV::EnvV => {
+        envJ::EnvJVM => {
+            match node {
+            #    | ComparisonNode (a1, a2)  -> 0 #todo
+            #    | LessThanNode (a1, a2)    -> 0 #todo
+            #    | GreaterThanNode (a1, a2) -> 0 #todo
+            #    | NotNode b                -> 0 #todo
+            #    | AndNode (b1, b2)         -> 0 #todo
+            #    | OrNode (b1, b2)          -> 0 #todo
+                | BoolParenNode a          -> genCodeBoolExpr a envV envJ
+            }
+        }
+    }
+}
+
+var genCodeArithExpr::(ArithExprNode -> (EnvV -> (EnvJVM -> ([JVMInstruction], Int, EnvJVM)))) = 
+node::ArithExprNode => {
+    envV::EnvV => {
+        envJ::EnvJVM => {
+            match node {
+                #| NumExprNode n         -> 0
+                #| VarExprNode v         -> 0
+                #| AddExprNode (a1, a2)  -> 0
+                #| SubExprNode (a1, a2)  -> 0
+                #| MultExprNode (a1, a2) -> 0
+                | ArithParenNode a      -> genCodeArithExpr a envV envJ
+            }
+        }
+    }
+}
+
+var program::StatementNode = SkipNode
+
+var bytes::[Char] = getClassBytes (generateClassFile program)
+
+var main::(System* -> (Bool, System*)) = 
+sys::System* => {
+    writeFile "Main.class" bytes sys
+}
 
 #test stuff
 var temp::MethodInfo = MethodInfo (
@@ -584,20 +649,12 @@ var temp::MethodInfo = MethodInfo (
 var classFile::ClassFile = ClassFile ([1,2,3,4], 0, 49, initialConstantPool, 123, 4, 5, [], [], [temp], [])
 
 #var content = getClassBytes classFile
-var content::[Char] = show (lookup Nil "test")
+var content::[Char] = bytes
 
-var contentToFile::(System* -> (Bool, System*)) = 
-sys::System* => {
-    let (status, sys2, file') = open_write sys "test" in (
-        let (status', file) = (writes content file') in (
-            close sys2 file
-        )
-    )
-}
 
-var main::(System* -> (Bool, File*)) = 
-sys::System* => {
-    let (index, env) = getConstantIndex (NumeralNode "42") (EnvC (Nil, initialConstantPool, length initialConstantPool)) in (
-        writes (show env) stdout
-    )
-}
+#var main::(System* -> (Bool, File*)) = 
+#sys::System* => {
+#    let envJ = updateJVME 0 0 (EnvC (Nil, initialConstantPool ++ [IntegerConstant 42], 25)) initialEnvJ in (
+#        writes (show envJ) stdout
+#    )
+#}
