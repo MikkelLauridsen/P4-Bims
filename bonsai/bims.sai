@@ -154,7 +154,7 @@ type JVMInstruction = {
 }
 
 type EnvC = {
-    | EnvC (Map, [PoolConstant], Int)
+    | EnvC (Map<String, Int>, [PoolConstant], Int)
 }
 
 type EnvJVM = {
@@ -162,7 +162,7 @@ type EnvJVM = {
 }
 
 type EnvV = {
-    | EnvV (Map, Int, Int)
+    | EnvV (Map<String, Int>, Int)
 }
 
 #-------------------------------------------------------------------
@@ -403,31 +403,55 @@ ins::JVMInstruction => {
 #Codegen
 #-------------------------------------------------------------------
 
-#getConstantIndex :: NumeralNode -> EnvC -> (UInt16, EnvC)
-#getConstantIndex num cPool@(indexMap, elements, poolSize) =
-#    case Map.lookup num indexMap of
-#        Nothing      -> (poolSize + 1, (indexMap', elements', poolSize'))
-#            where 
-#                indexMap' = insert num poolSize indexMap
-#                elements' = elements ++ [(IntegerConstant (read num::UInt32))]
-#                poolSize' = poolSize + 1
-#        (Just index) -> (index + 1, cPool)
+var getConstantIndex::(NumeralNode -> (EnvC -> (Int, EnvC))) = 
+numNode::NumeralNode => {
+    cPool::EnvC => {
+        match (numNode, cPool) {
+            | (NumeralNode numS, EnvC (indexMap, elements, poolSize)) ->
+                match (lookup indexMap numS)  {
+                    | Nothing -> (
+                        poolSize + 1, EnvC (
+                            bind indexMap numS poolSize,
+                            let (?, num) = to_int numS in (
+                                elements ++ [IntegerConstant num]
+                            ),
+                            poolSize + 1
+                        )
+                    )
+                    | Just index -> (index + 1, cPool)
+                }
+        }
+    }
+}
 
-##todo
-#var getConstantIndex::(NumeralNode -> (EnvC -> (UInt16, EnvC))) = 
-#num => {
-#    cPool => {
-#        0
-#    }
-#}
-#
-##todo
-#var getVarIndex::(VarNode -> (EnvV -> (UInt16, EnvC))) = 
-#num => {
-#    cPool => {
-#        0
-#    }
-#}
+#getVarIndex :: VarNode -> EnvV -> (UInt8, EnvV, Bool)
+#getVarIndex var varEnv@(indexMap, varCount) =
+#    case Map.lookup var indexMap of
+#        Nothing      -> (varCount + 1, (indexMap', varCount'), False)
+#            where 
+#                indexMap' = insert var varCount indexMap
+#                varCount' = varCount + 1
+#        (Just index) -> (index + 1, varEnv, True)
+
+#todo
+var getVarIndex::(VarNode -> (EnvV -> (Int, EnvV, Bool))) = 
+varNode::VarNode => {
+    varEnv::EnvV => {
+        match (varNode, varEnv) {
+            | (VarNode vari, EnvV (indexMap, varCount)) ->
+                match (lookup indexMap vari)  {
+                    | Nothing -> (
+                            varCount + 1, EnvV (
+                                bind indexMap vari varCount,
+                                varCount + 1
+                            ),
+                            false
+                        )
+                    | Just index -> (index + 1, varEnv, true)
+                }
+        }
+    }
+}
 
 var initialConstantPool::[PoolConstant] = [
     # 1
@@ -470,14 +494,13 @@ var initInstructions::[JVMInstruction] = [
 ]
 
 ##todo
-#var initialEnvV = 0
-#var initialEnvJ = 0
+var initialEnvV::EnvV = EnvV (Nil, 0)
+var initialEnvJ::EnvJVM = EnvJVM (2, 1, 1, EnvC (Nil, initialConstantPool, length initialConstantPool))
 #
 #var generateClassFile = ast => {
 #    0
 #}
 
-#todo
 var updateJVM::(Int -> (Int -> (EnvJVM -> EnvJVM))) = 
 s::Int => {
     l::Int => {
@@ -487,7 +510,6 @@ s::Int => {
     }
 }
 
-#todo
 var updateJVME::(Int -> (Int -> (Int -> (EnvJVM -> EnvJVM)))) = 
 s::Int => {
     l::Int => {
@@ -573,7 +595,9 @@ sys::System* => {
     )
 }
 
-var main::(System* -> (Bool, System*)) = 
+var main::(System* -> (Bool, File*)) = 
 sys::System* => {
-    contentToFile sys
+    let (index, env) = getConstantIndex (NumeralNode "42") (EnvC (Nil, initialConstantPool, length initialConstantPool)) in (
+        writes (show env) stdout
+    )
 }
