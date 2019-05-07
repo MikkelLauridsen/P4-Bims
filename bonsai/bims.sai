@@ -2,6 +2,11 @@
 #Utility types
 #-------------------------------------------------------------------
 
+type Maybe<a> = {
+    | Just a
+    | Nothing
+}
+
 type Map<k,v> = {
     | Node (k, v, Map, Map)
     | Nil
@@ -148,15 +153,37 @@ type JVMInstruction = {
     | JVMinvokespecial Int  # Invoke special method (used for constructor)
 }
 
-    
+type EnvC = {
+    | EnvC (Map, [PoolConstant], Int)
+}
+
+type EnvJVM = {
+    | EnvJVM (Int, Int, Int, EnvC)
+}
+
+type EnvV = {
+    | EnvV (Map, Int, Int)
+}
+
 #-------------------------------------------------------------------
 #Utility functions
 #-------------------------------------------------------------------
 
+var max::(Int -> (Int -> Int)) =
+a::Int => {
+    b::Int => {
+        case {
+            | a > b -> a
+            | ?     -> b
+        }
+    }
+}
+
+
 var bind::(Map<k,v> -> (k -> (v -> Map<k,v>))) = 
-map => {
-    key => {
-        value => {
+map::Map<k,v> => {
+    key::k => {
+        value::v => {
             match map {
                 | Nil -> Node (key, value, Nil, Nil)
                 | Node (key', value', map1', map2') -> 
@@ -171,8 +198,8 @@ map => {
 }
 
 var lookup::(Map<k,v> -> (k -> Maybe<v>)) = 
-map => {
-    key => {
+map::Map<k,v> => {
+    key::k => {
         match map {
             | Nil -> Nothing
             | Node (key', value', map1', map2') ->
@@ -186,8 +213,8 @@ map => {
 }
 
 var writes::(String -> (File* -> (Bool, File*))) = 
-s => {
-    f => {
+s::String => {
+    f::File* => {
         match s {
             | []     -> (true, f)
             | (c:cs) -> 
@@ -202,7 +229,7 @@ s => {
 }
 
 var length::([a] -> Int) = 
-l => {
+l::[a] => {
     match l {
         | []     -> 0
         | (c:cs) -> 1 + length cs
@@ -210,8 +237,8 @@ l => {
 }
 
 var map::((a -> b) -> ([a] -> [b])) = 
-fun => {
-    lst => {
+fun::(a -> b) => {
+    lst::[a] => {
         match lst {
             | [] -> []
             | (x:xs) -> ((fun x) : (map fun xs))
@@ -220,7 +247,7 @@ fun => {
 }
 
 var concat::([[a]] -> [a]) = 
-lst => {
+lst::[[a]] => {
     match lst {
         | [] -> []
         | (x:xs) -> x ++ (concat xs) 
@@ -232,15 +259,15 @@ lst => {
 #-------------------------------------------------------------------
 
 var getByte::(Int -> (Int -> Char)) = 
-b => {
-    num => {
+b::Int => {
+    num::Int => {
         i2c (num b>> (8 * b) b& 0xFF)
     }
 }
 
 var getBytes::(Int -> (Int -> [Char])) = 
-c => {
-    num => {
+c::Int => {
+    num::Int => {
         case {
             | c == 0 -> []
             | ? -> (getByte (c - 1) num : getBytes (c - 1) num)
@@ -252,15 +279,15 @@ var uint8ToBytes::(Int -> [Char]) = getBytes 1
 var uint16ToBytes::(Int -> [Char]) = getBytes 2
 var uint32ToBytes::(Int -> [Char]) = getBytes 4
 
-var int16ToBytes = uint16ToBytes
+var int16ToBytes::(Int -> [Char]) = uint16ToBytes
 
 var tableToBytes::((a -> [Char]) -> ([a] -> [Char])) = 
-f => { 
-    l => { concat (map f l) }
+f::(a -> [Char]) => { 
+    l::[a] => { concat (map f l) }
 }
 
 var poolConstantToBytes::(PoolConstant -> [Char]) = 
-pc => {
+pc::PoolConstant => {
     match pc {
         | StringConstant str     -> uint8ToBytes  1 ++ uint16ToBytes (length str) ++ str
         | IntegerConstant i      -> uint8ToBytes  3 ++ uint32ToBytes i
@@ -273,12 +300,14 @@ pc => {
 }
 
 #todo last
-var fieldToBytes::(FieldInfo -> [Char]) = field => {
+var fieldToBytes::(FieldInfo -> [Char]) = 
+field::FieldInfo => {
     []
 }
 
 
-var methodToBytes::(MethodInfo -> [Char]) = method => {
+var methodToBytes::(MethodInfo -> [Char]) = 
+method::MethodInfo => {
     match method {
         | MethodInfo (accessFlags, name, descriptor, attributes) ->
             uint16ToBytes accessFlags ++
@@ -289,7 +318,8 @@ var methodToBytes::(MethodInfo -> [Char]) = method => {
     }
 }
 
-var attributeToBytes::(AttributeInfo -> [Char]) = attribute => {
+var attributeToBytes::(AttributeInfo -> [Char]) = 
+attribute::AttributeInfo => {
     match attribute {
         | AttributeInfo (name, info) -> [] #todo last
         | CodeAttributeInfo (name, maxStack, maxLocals, code, exceptions, attributes) ->
@@ -314,12 +344,14 @@ var attributeToBytes::(AttributeInfo -> [Char]) = attribute => {
 }
 
 #todo last
-var exceptionToBytes::(ExceptionInfo -> [Char]) = exception => {
+var exceptionToBytes::(ExceptionInfo -> [Char]) = 
+exception::ExceptionInfo => {
     []
 }
 
 
-var getClassBytes::(ClassFile -> [Char]) = class => {
+var getClassBytes::(ClassFile -> [Char]) = 
+class::ClassFile => {
     match class {
         | ClassFile (magicNumber, versionMinor, versionMajor, constantPool, accessFlags, 
         thisClass, superClass, interfaces, fields, methods, attributes) ->
@@ -342,7 +374,8 @@ var getClassBytes::(ClassFile -> [Char]) = class => {
     }
 }
 
-var getInstructionBytes = ins => {
+var getInstructionBytes::(JVMInstruction -> [Char]) = 
+ins::JVMInstruction => {
     match ins {
         | JVMiconst_0        -> (i2c 0x03 : [])
         | JVMiconst_1        -> (i2c 0x04 : [])
@@ -355,7 +388,7 @@ var getInstructionBytes = ins => {
         | JVMisub            -> (i2c 0x64 : [])
         | JVMimul            -> (i2c 0x68 : [])
         | JVMif_icmpeq b     -> (i2c 0x9F : int16ToBytes b)
-        | JVMif_icmpne b     -> (i2c 0xa0 : int16ToBytes b)
+        | JVMif_icmpne b     -> (i2c 0xA0 : int16ToBytes b)
         | JVMif_icmplt b     -> (i2c 0xA1 : int16ToBytes b)
         | JVMif_icmpgt b     -> (i2c 0xA3 : int16ToBytes b)
         | JVMgoto b          -> (i2c 0xA7 : int16ToBytes b)
@@ -370,21 +403,33 @@ var getInstructionBytes = ins => {
 #Codegen
 #-------------------------------------------------------------------
 
-#todo
-var getConstantIndex::(NumeralNode -> (EnvC -> (UInt16, EnvC))) = num => {
-    cPool => {
-        0
-    }
-}
+#getConstantIndex :: NumeralNode -> EnvC -> (UInt16, EnvC)
+#getConstantIndex num cPool@(indexMap, elements, poolSize) =
+#    case Map.lookup num indexMap of
+#        Nothing      -> (poolSize + 1, (indexMap', elements', poolSize'))
+#            where 
+#                indexMap' = insert num poolSize indexMap
+#                elements' = elements ++ [(IntegerConstant (read num::UInt32))]
+#                poolSize' = poolSize + 1
+#        (Just index) -> (index + 1, cPool)
 
-#todo
-var getVarIndex::(VarNode -> (EnvV -> (UInt16, EnvC))) = num => {
-    cPool => {
-        0
-    }
-}
+##todo
+#var getConstantIndex::(NumeralNode -> (EnvC -> (UInt16, EnvC))) = 
+#num => {
+#    cPool => {
+#        0
+#    }
+#}
+#
+##todo
+#var getVarIndex::(VarNode -> (EnvV -> (UInt16, EnvC))) = 
+#num => {
+#    cPool => {
+#        0
+#    }
+#}
 
-var initialConstantPool = [
+var initialConstantPool::[PoolConstant] = [
     # 1
     MethodRef (5, 12),
     FieldRef (13, 14),
@@ -416,119 +461,119 @@ var initialConstantPool = [
     StringConstant "(I)V"
 ]
 
-var printConstantIndex = 3
+var printConstantIndex::Int = 3
 
-var initInstructions = [
+var initInstructions::[JVMInstruction] = [
     JVMaload_0,
     JVMinvokespecial 1,
     JVMreturn
 ]
 
-#todo
-var initialEnvV = 0
-var initialEnvJ = 0
+##todo
+#var initialEnvV = 0
+#var initialEnvJ = 0
+#
+#var generateClassFile = ast => {
+#    0
+#}
 
-var generateClassFile = ast => {
-    0
-}
-
 #todo
-var updateJVM = s => {
-    l => {
-        envJ => {
+var updateJVM::(Int -> (Int -> (EnvJVM -> EnvJVM))) = 
+s::Int => {
+    l::Int => {
+        envJ::EnvJVM => {
             updateJVME s l 0 envJ
         }
     }
 }
 
 #todo
-var updateJVME = s => {
-    l => {
-        c => {
-            envJ => {
-                0
+var updateJVME::(Int -> (Int -> (Int -> (EnvJVM -> EnvJVM)))) = 
+s::Int => {
+    l::Int => {
+        c::Int => {
+            envJ::EnvJVM => {
+                match envJ {
+                    | EnvJVM (curStack, maxStack, maxLocals, c) ->
+                        EnvJVM (curStack + s, max curStack maxStack, maxLocals + l, c)
+                }
             }
         }
     }
 }
 
-#todo
-var genCodeStatement = node => {
-    envV => {
-        envJ => {
-            match node {
-                | AssignmentNode (v, a)  -> 0
-                | SkipNode               -> 0
-                | CompositeNode (s1, s2) -> 0
-                | IfNode (b, s1, s2)     -> 0
-                | WhileNode (b, s)       -> 0
-                | PrintNode (a)          -> 0
-            }
-        }
-    }
-}
-
-#todo
-var genCodeBoolExpr = node => {
-    envV => {
-        envJ => {
-            match node {
-                | ComparisonNode (a1, a2)  -> 0
-                | LessThanNode (a1, a2)    -> 0
-                | GreaterThanNode (a1, a2) -> 0
-                | NotNode b                -> 0
-                | AndNode (b1, b2)         -> 0
-                | OrNode (b1, b2)          -> 0
-                | BoolParenNode a          -> 0
-            }
-        }
-    }
-}
-
-#todo
-var genCodeArithExpr = node => {
-    envV => {
-        envJ => {
-            match node {
-                | NumExprNode n         -> 0
-                | VarExprNode v         -> 0
-                | AddExprNode (a1, a2)  -> 0
-                | SubExprNode (a1, a2)  -> 0
-                | MultExprNode (a1, a2) -> 0
-                | ArithParenNode a      -> 0
-            }
-        }
-    }
-}
-
-var count = i => {
-    case {
-        | i == 256 -> []
-        | ? -> (i2c i : count (i + 1))
-    }
-}
+##todo
+#var genCodeStatement = node => {
+#    envV => {
+#        envJ => {
+#            match node {
+#                | AssignmentNode (v, a)  -> 0
+#                | SkipNode               -> 0
+#                | CompositeNode (s1, s2) -> 0
+#                | IfNode (b, s1, s2)     -> 0
+#                | WhileNode (b, s)       -> 0
+#                | PrintNode (a)          -> 0
+#            }
+#        }
+#    }
+#}
+#
+##todo
+#var genCodeBoolExpr = node => {
+#    envV => {
+#        envJ => {
+#            match node {
+#                | ComparisonNode (a1, a2)  -> 0
+#                | LessThanNode (a1, a2)    -> 0
+#                | GreaterThanNode (a1, a2) -> 0
+#                | NotNode b                -> 0
+#                | AndNode (b1, b2)         -> 0
+#                | OrNode (b1, b2)          -> 0
+#                | BoolParenNode a          -> 0
+#            }
+#        }
+#    }
+#}
+#
+##todo
+#var genCodeArithExpr = node => {
+#    envV => {
+#        envJ => {
+#            match node {
+#                | NumExprNode n         -> 0
+#                | VarExprNode v         -> 0
+#                | AddExprNode (a1, a2)  -> 0
+#                | SubExprNode (a1, a2)  -> 0
+#                | MultExprNode (a1, a2) -> 0
+#                | ArithParenNode a      -> 0
+#            }
+#        }
+#    }
+#}
 
 #test stuff
-var bytes = count 0
-
-var bytesback = map c2i bytes
-
-var temp = MethodInfo (
+var temp::MethodInfo = MethodInfo (
     123,
     1,
     2,
     [CodeAttributeInfo (8, 32, 32, initInstructions, [], [])]
 )
 
-var classFile = ClassFile ([1,2,3,4], 0, 49, initialConstantPool, 123, 4, 5, [], [], [temp], [])
+var classFile::ClassFile = ClassFile ([1,2,3,4], 0, 49, initialConstantPool, 123, 4, 5, [], [], [temp], [])
 
-var content = getClassBytes classFile
-#var content = show initialConstantPool
+#var content = getClassBytes classFile
+var content::[Char] = show (lookup Nil "test")
 
-var main = sys => {
+var contentToFile::(System* -> (Bool, System*)) = 
+sys::System* => {
     let (status, sys2, file') = open_write sys "test" in (
         let (status', file) = (writes content file') in (
             close sys2 file
         )
     )
+}
+
+var main::(System* -> (Bool, System*)) = 
+sys::System* => {
+    contentToFile sys
 }
