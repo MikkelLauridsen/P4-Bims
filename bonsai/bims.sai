@@ -318,10 +318,16 @@ pc::PoolConstant => {
     }
 }
 
-#todo last
 var fieldToBytes::(FieldInfo -> [Char]) = 
 field::FieldInfo => {
-    []
+    match field {
+        | FieldInfo (accessFlags, name, descriptor, attributes) ->
+            uint16ToBytes accessFlags ++
+            uint16ToBytes name ++
+            uint16ToBytes descriptor ++
+            uint16ToBytes (length attributes) ++
+            tableToBytes attributeToBytes attributes 
+    }
 }
 
 
@@ -340,7 +346,10 @@ method::MethodInfo => {
 var attributeToBytes::(AttributeInfo -> [Char]) = 
 attribute::AttributeInfo => {
     match attribute {
-        | AttributeInfo (name, info) -> [] #todo last
+        | AttributeInfo (name, info) -> 
+            uint16ToBytes name ++
+            uint32ToBytes (length info) ++
+            tableToBytes uint8ToBytes info
         | CodeAttributeInfo (name, maxStack, maxLocals, code, exceptions, attributes) ->
             let codeBytes = tableToBytes getInstructionBytes code in (
                 uint16ToBytes name ++
@@ -362,10 +371,15 @@ attribute::AttributeInfo => {
     }
 }
 
-#todo last
 var exceptionToBytes::(ExceptionInfo -> [Char]) = 
 exception::ExceptionInfo => {
-    []
+    match exception {
+        | ExceptionInfo (startPc, endPc, handlerPc, catchType) ->
+            uint16ToBytes startPc ++
+            uint16ToBytes endPc ++
+            uint16ToBytes handlerPc ++
+            uint16ToBytes catchType
+    }
 }
 
 
@@ -505,22 +519,6 @@ var initInstructions::[JVMInstruction] = [
 var initialEnvV::EnvV = EnvV (Nil, 0)
 var initialEnvJ::EnvJVM = EnvJVM (2, 1, 1, EnvC (Nil, initialConstantPool, length initialConstantPool))
 
-#generateClassFile :: StatementNode -> ClassFile
-#generateClassFile ast =
-#    let (ins, _, _, (_, maxStack, maxLocals, (_, cPool, _))) = genCodeStatement ast initialEnvV initialEnvJ in ClassFile 
-#        [0xCA, 0xFE, 0xBA, 0xBE] -- magic number
-#        0       -- version minor
-#        49      -- version major
-#        cPool
-#        0x0000  -- access flags
-#        4       -- this class (Main)
-#        5       -- super class (java/lang/Object)
-#        []      -- interfaces 
-#        []      -- fields
-#        [ (MethodInfo 0x0001 6 7 [(CodeAttributeInfo 8 1 1 initInstructions [] [])]), -- <init> method
-#          (MethodInfo 0x0009 9 10 [(CodeAttributeInfo 8 maxStack maxLocals (ins ++ [JVMreturn]) [] [])]) ] -- main method
-#        []      --attributes
-
 var generateClassFile::(StatementNode -> ClassFile) = 
 ast::StatementNode => {
     match genCodeStatement ast initialEnvV initialEnvJ {
@@ -586,11 +584,66 @@ node::StatementNode => {
                             )
                         )
                     )
+
                 | SkipNode -> ([], 0, envV, envJ)
-            #    | CompositeNode (s1, s2) -> 0 #todo
-            #    | IfNode (b, s1, s2)     -> 0 #todo
-            #    | WhileNode (b, s)       -> 0 #todo
-            #    | PrintNode (a)          -> 0 #todo
+
+                | CompositeNode (s1, s2) ->
+                    let (s1Ins, s1InsSize, envV2, envJ2) = genCodeStatement s1 envV envJ in (
+                        let (s2Ins, s2InsSize, envV', envJ') = genCodeStatement s2 envV2 envJ2 in (
+                            ( s1Ins ++ s2Ins
+                            , s1InsSize + s2InsSize
+                            , envV'
+                            , envJ'
+                            )
+                        )
+                    )
+
+                | IfNode (b, s1, s2) ->
+                    let (bIns, bInsSize, envJ3) = genCodeBoolExpr b envV envJ in (
+                        let (s1Ins, s1InsSize, envV2, envJ2) = genCodeStatement s1 envV envJ3 in (
+                            let (s2Ins, s2InsSize, envV', envJ') = genCodeStatement s2 envV2 envJ2 in (
+                                ( bIns ++
+                                [ JVMiconst_1
+                                , JVMif_icmpne (s1InsSize + 6) # jump else
+                                ] ++
+                                s1Ins ++
+                                [JVMgoto (s2InsSize + 3)] ++ # jump end
+                                s2Ins # label: else
+                                #label: end
+                                , bInsSize + s1InsSize + s2InsSize + 6
+                                , envV'
+                                , updateJVM (-1) 0 envJ'
+                                )
+                            )
+                        )
+                    )
+
+                | WhileNode (b, s) ->
+                    let (sIns, sInsSize, envV2, envJ2) = genCodeStatement s envV envJ in (
+                        let (bIns, bInsSize, envJ') = genCodeBoolExpr b envV2 envJ2 in (
+                            ( [JVMgoto (3 + sInsSize)] ++ # jump predicate
+                            sIns ++ # label: loop
+                            bIns ++ # label: predicate
+                            [ JVMiconst_1
+                            , JVMif_icmpeq (~(sInsSize + bInsSize + 1)) # jump loop
+                            ]
+                            , sInsSize + bInsSize + 7
+                            , envV
+                            , envJ'
+                            )
+                        )
+                    )
+
+                | PrintNode a ->
+                    let (aIns, aInsSize, envJ') = genCodeArithExpr a envV envJ in (
+                        ( [JVMgetstatic 2] ++
+                        aIns ++
+                        [JVMinvokevirtual printConstantIndex] # call print
+                        , aInsSize + 6
+                        , envV
+                        , updateJVM (-1) 0 envJ'
+                        )
+                    )
             }
         }
     }
@@ -601,13 +654,111 @@ node::BoolExprNode => {
     envV::EnvV => {
         envJ::EnvJVM => {
             match node {
-            #    | ComparisonNode (a1, a2)  -> 0 #todo
-            #    | LessThanNode (a1, a2)    -> 0 #todo
-            #    | GreaterThanNode (a1, a2) -> 0 #todo
-            #    | NotNode b                -> 0 #todo
-            #    | AndNode (b1, b2)         -> 0 #todo
-            #    | OrNode (b1, b2)          -> 0 #todo
-                | BoolParenNode a          -> genCodeBoolExpr a envV envJ
+                | ComparisonNode (a1, a2) ->
+                    let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
+                        let (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ2 in (
+                            ( a1Ins ++ a2Ins ++
+                            [ JVMif_icmpne 7 #jump true
+                            , JVMiconst_1
+                            , JVMgoto 4 #jump end
+                            , JVMiconst_0 #label: true
+                                #label: end
+                            ]
+                            , a1InsSize + a2InsSize + 8
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | LessThanNode (a1, a2) ->
+                    let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
+                        let (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ2 in (
+                            ( a1Ins ++ a2Ins ++
+                            [ JVMif_icmplt 7 #jump true
+                            , JVMiconst_0
+                            , JVMgoto 4 #jump end
+                            , JVMiconst_1 #label: true
+                                #label: end
+                            ]
+                            , a1InsSize + a2InsSize + 8
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | GreaterThanNode (a1, a2) ->
+                    let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
+                        let (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ2 in (
+                            ( a1Ins ++ a2Ins ++
+                            [ JVMif_icmpgt 7 #jump true
+                            , JVMiconst_0
+                            , JVMgoto 4 #jump end
+                            , JVMiconst_1 #label: true
+                                #label: end
+                            ]
+                            , a1InsSize + a2InsSize + 8
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+                | NotNode b ->
+                    let (bIns, bInsSize, envJ') = genCodeBoolExpr b envV envJ in (
+                        ( bIns ++
+                        [ JVMiconst_1
+                        , JVMif_icmpne 7 #jump true
+                        , JVMiconst_0
+                        , JVMgoto 4 #jump end
+                        , JVMiconst_1 #label: true
+                            #label: end
+                        ]
+                        , bInsSize + 9
+                        , envJ'
+                        )
+                    )
+
+                | AndNode (b1, b2) -> 
+                    let (b1Ins, b1InsSize, envJ2) = genCodeBoolExpr b1 envV envJ in (
+                        let (b2Ins, b2InsSize, envJ') = genCodeBoolExpr b2 envV envJ2 in (
+                            ( b1Ins ++
+                            [ JVMiconst_1
+                            , JVMif_icmpne (b2InsSize + 11) #jump false
+                            ] ++
+                            b2Ins ++
+                            [ JVMiconst_1
+                            , JVMif_icmpne 7 #jump false
+                            , JVMiconst_1
+                            , JVMgoto 4 #jump end
+                            , JVMiconst_0 #label: false
+                                #label: end
+                            ]
+                            , b1InsSize + b2InsSize + 13
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | OrNode (b1, b2) ->
+                    let (b1Ins, b1InsSize, envJ2) = genCodeBoolExpr b1 envV envJ in (
+                        let (b2Ins, b2InsSize, envJ') = genCodeBoolExpr b2 envV envJ2 in (
+                            ( b1Ins ++
+                            [ JVMiconst_1
+                            , JVMif_icmpeq (b2InsSize + 11) #jump true
+                            ] ++
+                            b2Ins ++
+                            [ JVMiconst_1
+                            , JVMif_icmpeq 7 #jump true
+                            , JVMiconst_0
+                            , JVMgoto 4 #jump end
+                            , JVMiconst_1 #label: true
+                                #label end
+                            ]
+                            , b1InsSize + b2InsSize + 13
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | BoolParenNode b -> genCodeBoolExpr b envV envJ
             }
         }
     }
@@ -618,43 +769,104 @@ node::ArithExprNode => {
     envV::EnvV => {
         envJ::EnvJVM => {
             match node {
-                #| NumExprNode n         -> 0
-                #| VarExprNode v         -> 0
-                #| AddExprNode (a1, a2)  -> 0
-                #| SubExprNode (a1, a2)  -> 0
-                #| MultExprNode (a1, a2) -> 0
-                | ArithParenNode a      -> genCodeArithExpr a envV envJ
+                | NumExprNode n -> 
+                    match envJ {
+                        | EnvJVM (?, ?, ?, envC) ->
+                            let (index, envC') = getConstantIndex n envC in (
+                                ( [JVMldc_w index]
+                                , 3
+                                , updateJVME 1 0 envC' envJ
+                                )
+                            )
+                    }
+                    
+                | VarExprNode v ->
+                    let (index, vars', ?) = getVarIndex v envV in (
+                        ( [JVMiload index]
+                        , 2
+                        , updateJVM 1 0 envJ
+                        )
+                    )
+
+                | AddExprNode (a1, a2) ->
+                    let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
+                        let (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ2 in (
+                            ( a1Ins ++ a2Ins ++ [JVMiadd]
+                            , a1InsSize + a2InsSize + 1
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | SubExprNode (a1, a2) ->
+                    let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
+                        let (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ2 in (
+                            ( a1Ins ++ a2Ins ++ [JVMisub]
+                            , a1InsSize + a2InsSize + 1
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | MultExprNode (a1, a2) ->
+                    let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
+                        let (a2Ins, a2InsSize, envJ') = genCodeArithExpr a2 envV envJ2 in (
+                            ( a1Ins ++ a2Ins ++ [JVMimul]
+                            , a1InsSize + a2InsSize + 1
+                            , updateJVM (-1) 0 envJ'
+                            )
+                        )
+                    )
+
+                | ArithParenNode a -> genCodeArithExpr a envV envJ
             }
         }
     }
 }
 
-var program::StatementNode = SkipNode
+var program::StatementNode =
+    CompositeNode (
+        CompositeNode (
+            AssignmentNode(
+                VarNode "x",
+                NumExprNode (NumeralNode "1")
+            ),
+            AssignmentNode(
+                VarNode "n",
+                NumExprNode (NumeralNode "10")
+            )
+        ),
 
+        WhileNode (
+            GreaterThanNode (
+                VarExprNode (VarNode "n"),
+                NumExprNode (NumeralNode "1")
+            ),
+            CompositeNode (
+                AssignmentNode (
+                    VarNode "x",
+                    MultExprNode (
+                        VarExprNode (VarNode "n"),
+                        VarExprNode (VarNode "x")
+                    )
+                ),
+                CompositeNode (
+                    AssignmentNode (
+                        VarNode "n",
+                        SubExprNode (
+                            VarExprNode (VarNode "n"),
+                            NumExprNode (NumeralNode "1")
+                        )
+                    ),
+                    PrintNode (VarExprNode (VarNode "x"))
+                )
+            )
+        )
+    )
+    
 var bytes::[Char] = getClassBytes (generateClassFile program)
 
 var main::(System* -> (Bool, System*)) = 
 sys::System* => {
     writeFile "Main.class" bytes sys
 }
-
-#test stuff
-var temp::MethodInfo = MethodInfo (
-    123,
-    1,
-    2,
-    [CodeAttributeInfo (8, 32, 32, initInstructions, [], [])]
-)
-
-var classFile::ClassFile = ClassFile ([1,2,3,4], 0, 49, initialConstantPool, 123, 4, 5, [], [], [temp], [])
-
-#var content = getClassBytes classFile
-var content::[Char] = bytes
-
-
-#var main::(System* -> (Bool, File*)) = 
-#sys::System* => {
-#    let envJ = updateJVME 0 0 (EnvC (Nil, initialConstantPool ++ [IntegerConstant 42], 25)) initialEnvJ in (
-#        writes (show envJ) stdout
-#    )
-#}
