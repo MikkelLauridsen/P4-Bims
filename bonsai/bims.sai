@@ -153,14 +153,21 @@ type JVMInstruction = {
     | JVMinvokespecial Int  # Invoke special method (used for constructor)
 }
 
+#-------------------------------------------------------------------
+#Code generation types
+#-------------------------------------------------------------------
+
+#contains constant pool int index map (Int -> index), constant pool, constant pool count
 type EnvC = {
     | EnvC (Map<String, Int>, [PoolConstant], Int)
 }
 
+#contains current stack size, max stack size, max locals, EnvC
 type EnvJVM = {
     | EnvJVM (Int, Int, Int, EnvC)
 }
 
+#contains variable name index map (name -> index), variable count
 type EnvV = {
     | EnvV (Map<String, Int>, Int)
 }
@@ -169,6 +176,7 @@ type EnvV = {
 #Utility functions
 #-------------------------------------------------------------------
 
+#return max of two integers
 var max::(Int -> (Int -> Int)) =
 a::Int => {
     b::Int => {
@@ -179,7 +187,7 @@ a::Int => {
     }
 }
 
-
+#updates a map with a key/value pair
 var bind::(Map<k,v> -> (k -> (v -> Map<k,v>))) = 
 map::Map<k,v> => {
     key::k => {
@@ -197,6 +205,7 @@ map::Map<k,v> => {
     }
 }
 
+#retrieves an element from a map, or Nothing of no such key exists
 var lookup::(Map<k,v> -> (k -> Maybe<v>)) = 
 map::Map<k,v> => {
     key::k => {
@@ -212,6 +221,7 @@ map::Map<k,v> => {
     }
 }
 
+#writes a string to an output file
 var writes::(String -> (File* -> (Bool, File*))) = 
 s::String => {
     f::File* => {
@@ -228,6 +238,7 @@ s::String => {
     }
 }
 
+#writes a file with specified content
 var writeFile::(String -> ([Char] ->  (System* -> (Bool, System*)))) =
 path::String => {
     bytes::[Char] => {
@@ -247,6 +258,7 @@ path::String => {
     }
 }
 
+#returns the length of a list
 var length::([a] -> Int) = 
 l::[a] => {
     match l {
@@ -255,6 +267,7 @@ l::[a] => {
     }
 }
 
+#returns a list with specified function, fun, applied to all elements of some list, lst
 var map::((a -> b) -> ([a] -> [b])) = 
 fun::(a -> b) => {
     lst::[a] => {
@@ -265,6 +278,7 @@ fun::(a -> b) => {
     }
 }
 
+#concatenates list of lists to a single list
 var concat::([[a]] -> [a]) = 
 lst::[[a]] => {
     match lst {
@@ -381,7 +395,6 @@ exception::ExceptionInfo => {
             uint16ToBytes catchType
     }
 }
-
 
 var getClassBytes::(ClassFile -> [Char]) = 
 class::ClassFile => {
@@ -544,7 +557,7 @@ var updateJVM::(Int -> (Int -> (EnvJVM -> EnvJVM))) =
 s::Int => {
     l::Int => {
         envJ::EnvJVM => {
-            match envJ {
+            match envJ { #extract envC from envJ
                 | EnvJVM (?, ?, ?, envC) ->
                     updateJVME s l envC envJ
             }
@@ -557,7 +570,7 @@ s::Int => {
     l::Int => {
         c::EnvC => {
             envJ::EnvJVM => {
-                match envJ {
+                match envJ { #extract components of envJ
                     | EnvJVM (curStack, maxStack, maxLocals, ?) ->
                         EnvJVM (curStack + s, max curStack maxStack, maxLocals + l, c)
                 }
@@ -701,6 +714,7 @@ node::BoolExprNode => {
                             )
                         )
                     )
+
                 | NotNode b ->
                     let (bIns, bInsSize, envJ') = genCodeBoolExpr b envV envJ in (
                         ( bIns ++
@@ -770,7 +784,7 @@ node::ArithExprNode => {
         envJ::EnvJVM => {
             match node {
                 | NumExprNode n -> 
-                    match envJ {
+                    match envJ { #extract envC from envJ
                         | EnvJVM (?, ?, ?, envC) ->
                             let (index, envC') = getConstantIndex n envC in (
                                 ( [JVMldc_w index]
