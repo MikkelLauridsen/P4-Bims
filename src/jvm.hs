@@ -85,6 +85,11 @@ data AttributeInfo
 
 getByte b num = fromIntegral $ (shiftR num (8 * b)) .&. 0xFF
 
+getBytes c num = 
+    if c == 0
+    then []
+    else (getByte (c - 1) num : getBytes (c - 1) num)
+
 getUint16Len :: [a] -> UInt16
 getUint16Len a = fromIntegral (Prelude.length a)
 
@@ -95,19 +100,13 @@ stringToBytes :: String -> [UInt8]
 stringToBytes str = map (toEnum . fromEnum) str 
 
 uint8ToBytes :: UInt8 -> [UInt8]
-uint8ToBytes i = [i]
+uint8ToBytes = getBytes 1
 
 uint16ToBytes :: UInt16 -> [UInt8]
-uint16ToBytes i = 
-    uint8ToBytes (getByte 1 i) ++ 
-    uint8ToBytes (getByte 0 i)
+uint16ToBytes = getBytes 2
 
 uint32ToBytes :: UInt32 -> [UInt8]
-uint32ToBytes i =
-    uint8ToBytes (getByte 3 i) ++
-    uint8ToBytes (getByte 2 i) ++ 
-    uint8ToBytes (getByte 1 i) ++ 
-    uint8ToBytes (getByte 0 i)
+uint32ToBytes = getBytes 4
 
 int16ToBytes :: Int16 -> [UInt8]
 int16ToBytes i = uint16ToBytes (fromIntegral i)
