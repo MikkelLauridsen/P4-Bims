@@ -4,6 +4,7 @@ import Ast
 import JVM
 import Data.ByteString
 import Codegen
+import Control.Exception
 
 -- Factorial of 5
 program = CompositeNode 
@@ -33,4 +34,8 @@ program = CompositeNode
 bytes = getClassBytes (generateClassFile program)
 
 main :: IO ()
-main = Data.ByteString.writeFile "Main.class" bytes
+main = do
+    e <- try (Data.ByteString.writeFile "Main.class" bytes) :: IO (Either IOException ())
+    case e of
+        (Right e) -> Prelude.putStrLn "Generated Main.class successfully"
+        (Left e)  -> Prelude.putStrLn "Failed to create Main.class"

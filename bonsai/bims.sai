@@ -177,9 +177,9 @@ type EnvV = {
 #-------------------------------------------------------------------
 
 #return max of two integers
-var max::(Int -> (Int -> Int)) =
-a::Int => {
-    b::Int => {
+var max::(a<<Ord>> -> (a<<Ord>> -> a<<Ord>>)) =
+a::a<<Ord>> => {
+    b::a<<Ord>> => {
         case {
             | a > b -> a
             | ?     -> b
@@ -188,9 +188,8 @@ a::Int => {
 }
 
 #updates a map with a key/value pair
-var bind::(Map<k,v> -> (k -> (v -> Map<k,v>))) = 
-map::Map<k,v> => {
-    key::k => {
+var bind::(Map<k<<Eq, Ord>>,v> -> (k<<Eq,Ord>> -> (v -> Map<k<<Eq,Ord>>,v>))) = map::Map<k<<Eq,Ord>>,v> => {
+    key::k<<Eq,Ord>> => {
         value::v => {
             match map {
                 | Nil -> Node (key, value, Nil, Nil)
@@ -206,9 +205,8 @@ map::Map<k,v> => {
 }
 
 #retrieves an element from a map, or Nothing of no such key exists
-var lookup::(Map<k,v> -> (k -> Maybe<v>)) = 
-map::Map<k,v> => {
-    key::k => {
+var lookup::(Map<k<<Eq,Ord>>,v> -> (k<<Eq,Ord>> -> Maybe<v>)) = map::Map<k<<Eq,Ord>>,v> => {
+    key::k<<Eq,Ord>> => {
         match map {
             | Nil -> Nothing
             | Node (key', value', map1', map2') ->
@@ -246,7 +244,7 @@ path::String => {
             let (status2, sys2, file') = open_write sys path in (
                 case {
                     | status2 == false -> (false, sys2)  #check open error
-                    | ? -> let (status', file) = writes content file' in (
+                    | ? -> let (status', file) = writes bytes file' in (
                         case {
                             | status' == false -> (false, sys2)  #check write error
                             | ? -> close sys2 file
@@ -458,7 +456,7 @@ numNode::NumeralNode => {
                     | Nothing -> (
                         poolSize + 1, EnvC (
                             bind indexMap numS poolSize,
-                            let (?, num) = to_int numS in (
+                            let (?, num) = s2i numS in (
                                 elements ++ [IntegerConstant num]
                             ),
                             poolSize + 1
@@ -877,10 +875,15 @@ var program::StatementNode =
             )
         )
     )
-    
+
 var bytes::[Char] = getClassBytes (generateClassFile program)
 
-var main::(System* -> (Bool, System*)) = 
+var main::(System* -> (Bool, File*)) = 
 sys::System* => {
-    writeFile "Main.class" bytes sys
+    let (status, sys') = writeFile "Main.class" bytes sys in (
+        case {
+            | status == true  -> writes "Generated Main.class successfully" stdout
+            | status == false -> writes "Failed to create Main.class" stdout
+        }
+    )
 }
