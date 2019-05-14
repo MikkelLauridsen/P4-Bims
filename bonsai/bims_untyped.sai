@@ -177,9 +177,9 @@ type EnvV = {
 #-------------------------------------------------------------------
 
 #return max of two integers
-var max::(a<<Ord>> -> (a<<Ord>> -> a<<Ord>>)) =
-a::a<<Ord>> => {
-    b::a<<Ord>> => {
+var max =
+a => {
+    b => {
         case {
             | a > b -> a
             | ?     -> b
@@ -188,9 +188,9 @@ a::a<<Ord>> => {
 }
 
 #updates a map with a key/value pair
-var bind::(Map<k<<Eq, Ord>>,v> -> (k<<Eq,Ord>> -> (v -> Map<k<<Eq,Ord>>,v>))) = map::Map<k<<Eq,Ord>>,v> => {
-    key::k<<Eq,Ord>> => {
-        value::v => {
+var bind = map => {
+    key => {
+        value => {
             match map {
                 | Nil -> Node (key, value, Nil, Nil)
                 | Node (key', value', map1', map2') -> 
@@ -205,9 +205,8 @@ var bind::(Map<k<<Eq, Ord>>,v> -> (k<<Eq,Ord>> -> (v -> Map<k<<Eq,Ord>>,v>))) = 
 }
 
 #retrieves an element from a map, or Nothing of no such key exists
-var lookup::(Map<k<<Eq,Ord>>,v> -> (k<<Eq,Ord>> -> Maybe<v>)) = 
-map::Map<k<<Eq,Ord>>,v> => {
-    key::k<<Eq,Ord>> => {
+var lookup = map => {
+    key => {
         match map {
             | Nil -> Nothing
             | Node (key', value', map1', map2') ->
@@ -221,9 +220,9 @@ map::Map<k<<Eq,Ord>>,v> => {
 }
 
 #writes a string to an output file
-var writes::(String -> (File* -> (Bool, File*))) = 
-s::String => {
-    f::File* => {
+var writes = 
+s => {
+    f => {
         match s {
             | []     -> (true, f)
             | (c:cs) -> 
@@ -238,10 +237,10 @@ s::String => {
 }
 
 #writes a file with specified content
-var writeFile::(String -> ([Char] ->  (System* -> (Bool, System*)))) =
-path::String => {
-    bytes::[Char] => {
-        sys::System* => {
+var writeFile =
+path => {
+    bytes => {
+        sys => {
             let (status2, sys2, file') = open_write sys path in (
                 case {
                     | status2 == false -> (false, sys2)  #check open error
@@ -258,8 +257,8 @@ path::String => {
 }
 
 #returns the length of a list
-var length::([a] -> Int) = 
-l::[a] => {
+var length = 
+l => {
     match l {
         | []     -> 0
         | (c:cs) -> 1 + length cs
@@ -267,9 +266,9 @@ l::[a] => {
 }
 
 #returns a list with specified function, fun, applied to all elements of some list, lst
-var map::((a -> b) -> ([a] -> [b])) = 
-fun::(a -> b) => {
-    lst::[a] => {
+var map = 
+fun => {
+    lst => {
         match lst {
             | [] -> []
             | (x:xs) -> ((fun x) : (map fun xs))
@@ -278,8 +277,8 @@ fun::(a -> b) => {
 }
 
 #concatenates list of lists to a single list
-var concat::([[a]] -> [a]) = 
-lst::[[a]] => {
+var concat = 
+lst => {
     match lst {
         | [] -> []
         | (x:xs) -> x ++ (concat xs) 
@@ -290,16 +289,16 @@ lst::[[a]] => {
 #JVM
 #-------------------------------------------------------------------
 
-var getByte::(Int -> (Int -> Char)) = 
-b::Int => {
-    num::Int => {
+var getByte = 
+b => {
+    num => {
         i2c (num b>> (8 * b) b& 0xFF)
     }
 }
 
-var getBytes::(Int -> (Int -> [Char])) = 
-c::Int => {
-    num::Int => {
+var getBytes = 
+c => {
+    num => {
         case {
             | c == 0 -> []
             | ? -> (getByte (c - 1) num : getBytes (c - 1) num)
@@ -307,19 +306,19 @@ c::Int => {
     }
 }
 
-var uint8ToBytes::(Int -> [Char]) = getBytes 1
-var uint16ToBytes::(Int -> [Char]) = getBytes 2
-var uint32ToBytes::(Int -> [Char]) = getBytes 4
+var uint8ToBytes = getBytes 1
+var uint16ToBytes = getBytes 2
+var uint32ToBytes = getBytes 4
 
-var int16ToBytes::(Int -> [Char]) = uint16ToBytes
+var int16ToBytes = uint16ToBytes
 
-var tableToBytes::((a -> [Char]) -> ([a] -> [Char])) = 
-f::(a -> [Char]) => { 
+var tableToBytes = 
+f => { 
     l::[a] => { concat (map f l) }
 }
 
-var poolConstantToBytes::(PoolConstant -> [Char]) = 
-pc::PoolConstant => {
+var poolConstantToBytes = 
+pc => {
     match pc {
         | StringConstant str     -> uint8ToBytes  1 ++ uint16ToBytes (length str) ++ str
         | IntegerConstant i      -> uint8ToBytes  3 ++ uint32ToBytes i
@@ -331,8 +330,8 @@ pc::PoolConstant => {
     }
 }
 
-var fieldToBytes::(FieldInfo -> [Char]) = 
-field::FieldInfo => {
+var fieldToBytes = 
+field => {
     match field {
         | FieldInfo (accessFlags, name, descriptor, attributes) ->
             uint16ToBytes accessFlags ++
@@ -344,8 +343,8 @@ field::FieldInfo => {
 }
 
 
-var methodToBytes::(MethodInfo -> [Char]) = 
-method::MethodInfo => {
+var methodToBytes = 
+method => {
     match method {
         | MethodInfo (accessFlags, name, descriptor, attributes) ->
             uint16ToBytes accessFlags ++
@@ -356,8 +355,8 @@ method::MethodInfo => {
     }
 }
 
-var attributeToBytes::(AttributeInfo -> [Char]) = 
-attribute::AttributeInfo => {
+var attributeToBytes = 
+attribute => {
     match attribute {
         | AttributeInfo (name, info) -> 
             uint16ToBytes name ++
@@ -384,8 +383,8 @@ attribute::AttributeInfo => {
     }
 }
 
-var exceptionToBytes::(ExceptionInfo -> [Char]) = 
-exception::ExceptionInfo => {
+var exceptionToBytes = 
+exception => {
     match exception {
         | ExceptionInfo (startPc, endPc, handlerPc, catchType) ->
             uint16ToBytes startPc ++
@@ -395,8 +394,8 @@ exception::ExceptionInfo => {
     }
 }
 
-var getClassBytes::(ClassFile -> [Char]) = 
-class::ClassFile => {
+var getClassBytes = 
+class => {
     match class {
         | ClassFile (magicNumber, versionMinor, versionMajor, constantPool, accessFlags, 
         thisClass, superClass, interfaces, fields, methods, attributes) ->
@@ -419,8 +418,8 @@ class::ClassFile => {
     }
 }
 
-var getInstructionBytes::(JVMInstruction -> [Char]) = 
-ins::JVMInstruction => {
+var getInstructionBytes = 
+ins => {
     match ins {
         | JVMiconst_0        -> (i2c 0x03 : [])
         | JVMiconst_1        -> (i2c 0x04 : [])
@@ -448,9 +447,9 @@ ins::JVMInstruction => {
 #Codegen
 #-------------------------------------------------------------------
 
-var getConstantIndex::(NumeralNode -> (EnvC -> (Int, EnvC))) = 
-numNode::NumeralNode => {
-    cPool::EnvC => {
+var getConstantIndex = 
+numNode => {
+    cPool => {
         match (numNode, cPool) {
             | (NumeralNode numS, EnvC (indexMap, elements, poolSize)) ->
                 match (lookup indexMap numS)  {
@@ -469,9 +468,9 @@ numNode::NumeralNode => {
     }
 }
 
-var getVarIndex::(VarNode -> (EnvV -> (Int, EnvV, Bool))) = 
-varNode::VarNode => {
-    varEnv::EnvV => {
+var getVarIndex = 
+varNode => {
+    varEnv => {
         match (varNode, varEnv) {
             | (VarNode vari, EnvV (indexMap, varCount)) ->
                 match lookup indexMap vari {
@@ -488,7 +487,7 @@ varNode::VarNode => {
     }
 }
 
-var initialConstantPool::[PoolConstant] = [
+var initialConstantPool = [
     # 1
     MethodRef (5, 12),
     FieldRef (13, 14),
@@ -520,19 +519,19 @@ var initialConstantPool::[PoolConstant] = [
     StringConstant "(I)V"
 ]
 
-var printConstantIndex::Int = 3
+var printConstantIndex = 3
 
-var initInstructions::[JVMInstruction] = [
+var initInstructions = [
     JVMaload_0,
     JVMinvokespecial 1,
     JVMreturn
 ]
 
-var initialEnvV::EnvV = EnvV (Nil, 0)
-var initialEnvJ::EnvJVM = EnvJVM (2, 1, 1, EnvC (Nil, initialConstantPool, length initialConstantPool))
+var initialEnvV = EnvV (Nil, 0)
+var initialEnvJ = EnvJVM (2, 1, 1, EnvC (Nil, initialConstantPool, length initialConstantPool))
 
-var generateClassFile::(StatementNode -> ClassFile) = 
-ast::StatementNode => {
+var generateClassFile = 
+ast => {
     match genCodeStatement ast initialEnvV initialEnvJ {
         | (ins, ?, ?, EnvJVM (?, maxStack, maxLocals, EnvC (?, cPool, ?))) -> 
             ClassFile (
@@ -552,10 +551,10 @@ ast::StatementNode => {
     }
 }
 
-var updateJVM::(Int -> (Int -> (EnvJVM -> EnvJVM))) = 
-s::Int => {
-    l::Int => {
-        envJ::EnvJVM => {
+var updateJVM = 
+s => {
+    l => {
+        envJ => {
             match envJ { #extract envC from envJ
                 | EnvJVM (?, ?, ?, envC) ->
                     updateJVME s l envC envJ
@@ -564,11 +563,11 @@ s::Int => {
     }
 }
 
-var updateJVME::(Int -> (Int -> (EnvC -> (EnvJVM -> EnvJVM)))) = 
-s::Int => {
-    l::Int => {
-        c::EnvC => {
-            envJ::EnvJVM => {
+var updateJVME = 
+s => {
+    l => {
+        c => {
+            envJ => {
                 match envJ { #extract components of envJ
                     | EnvJVM (curStack, maxStack, maxLocals, ?) ->
                         EnvJVM (curStack + s, max curStack maxStack, maxLocals + l, c)
@@ -578,10 +577,10 @@ s::Int => {
     }
 }
 
-var genCodeStatement::(StatementNode -> (EnvV -> (EnvJVM -> ([JVMInstruction], Int, EnvV, EnvJVM)))) = 
-node::StatementNode => {
-    envV::EnvV => {
-        envJ::EnvJVM => {
+var genCodeStatement = 
+node => {
+    envV => {
+        envJ => {
             match node {
                 | AssignmentNode (v, a)  -> 
                     let (aIns, aInsSize, envJ') = genCodeArithExpr a envV envJ in (
@@ -661,10 +660,10 @@ node::StatementNode => {
     }
 }
 
-var genCodeBoolExpr::(BoolExprNode -> (EnvV -> (EnvJVM -> ([JVMInstruction], Int, EnvJVM)))) = 
-node::BoolExprNode => {
-    envV::EnvV => {
-        envJ::EnvJVM => {
+var genCodeBoolExpr = 
+node => {
+    envV => {
+        envJ => {
             match node {
                 | ComparisonNode (a1, a2) ->
                     let (a1Ins, a1InsSize, envJ2) = genCodeArithExpr a1 envV envJ in (
@@ -777,10 +776,10 @@ node::BoolExprNode => {
     }
 }
 
-var genCodeArithExpr::(ArithExprNode -> (EnvV -> (EnvJVM -> ([JVMInstruction], Int, EnvJVM)))) = 
-node::ArithExprNode => {
-    envV::EnvV => {
-        envJ::EnvJVM => {
+var genCodeArithExpr = 
+node => {
+    envV => {
+        envJ => {
             match node {
                 | NumExprNode n -> 
                     match envJ { #extract envC from envJ
@@ -837,8 +836,7 @@ node::ArithExprNode => {
     }
 }
 
-#factorial program in Bims
-var program::StatementNode =
+var program =
     CompositeNode (
         CompositeNode (
             AssignmentNode(
@@ -878,10 +876,10 @@ var program::StatementNode =
         )
     )
 
-var bytes::[Char] = getClassBytes (generateClassFile program)
+var bytes = getClassBytes (generateClassFile program)
 
-var main::(System* -> (Bool, File*)) = 
-sys::System* => {
+var main = 
+sys => {
     let (status, sys') = writeFile "Main.class" bytes sys in (
         case {
             | status == true  -> writes "Generated Main.class successfully" stdout
