@@ -1,4 +1,4 @@
-# P4-Bims-Haskell
+# P4-Bims
 
 Implementation of a compilers of the language Bims from the book "Transitions and Trees: An Introduction to Structural Operational Semantics". Target machine is JVM.
 
