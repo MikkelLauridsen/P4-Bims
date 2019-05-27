@@ -1,10 +1,10 @@
 name:                P4-Bims-Haskell
 version:             0.1.0.0
-github:              "githubuser/P4-Bims-Haskell"
+github:              "Spidercoder/P4-Bims"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              Group d406f19 - Aalborg University
+maintainer:          Group d406f19 - Aalborg University
+copyright:           Group d406f19 - Aalborg University 2019
 
 extra-source-files:
 - README.md
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/P4-Bims-Haskell#readme>
+description:         Please see the README on GitHub at <https://github.com/Spidercoder/P4-Bims#readme>
 
 dependencies:
 - base >= 4.7 && < 5
